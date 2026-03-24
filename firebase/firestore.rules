@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasTenantAccess(tenantId) {
+      return isAuthenticated() && request.auth.token.tenantId == tenantId;
+    }
+
+    function hasCustomAuditFields() {
+      return request.resource.data.createdAtCustom is string
+        && request.resource.data.updatedAtCustom is string
+        && request.resource.data.createdBy is string
+        && request.resource.data.updatedBy is string;
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if hasTenantAccess(tenantId);
+      allow create, update, delete: if false;
+
+      match /{collectionName}/{docId} {
+        allow read: if hasTenantAccess(tenantId);
+
+        // Escrituras por cliente solo como fallback controlado.
+        // Recomendado: ejecutar mutaciones críticas via Cloud Functions.
+        allow create, update: if hasTenantAccess(tenantId)
+          && request.resource.data.tenantId == tenantId
+          && hasCustomAuditFields();
+
+        allow delete: if false;
+      }
+    }
+  }
+}

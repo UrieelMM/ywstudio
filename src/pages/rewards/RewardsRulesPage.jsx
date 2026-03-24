@@ -20,7 +20,9 @@ import {
   REWARD_STATUS,
   USER_STATUS,
 } from '../../domain/loyalty/programConfig'
+import { dataContractSchemas } from '../../domain/loyalty/dataContract'
 import { useLoyaltyProgramStore } from '../../store/useLoyaltyProgramStore'
+import { useLoyaltyDataContractStore } from '../../store/useLoyaltyDataContractStore'
 
 const rewardColumns = [
   { key: 'nombre', label: 'Premio' },
@@ -48,6 +50,9 @@ function RewardsRulesPage() {
   const setMilestones = useLoyaltyProgramStore((state) => state.setMilestones)
   const runCheckInSimulation = useLoyaltyProgramStore((state) => state.runCheckInSimulation)
   const runRedemptionSimulation = useLoyaltyProgramStore((state) => state.runRedemptionSimulation)
+  const contractVersion = useLoyaltyDataContractStore((state) => state.contractVersion)
+  const createSampleRecord = useLoyaltyDataContractStore((state) => state.createSampleRecord)
+  const lastValidationReport = useLoyaltyDataContractStore((state) => state.lastValidationReport)
 
   const activeRewards = rewardTemplates.filter(
     (item) => item.status === REWARD_STATUS.ACTIVE,
@@ -111,6 +116,15 @@ function RewardsRulesPage() {
     toast.success(`Canje permitido: -${result.visitsToDebit} visitas`)
   }
 
+  const runContractValidation = (entityKey) => {
+    const { report } = createSampleRecord(entityKey)
+    if (report.valid) {
+      toast.success(`Contrato ${entityKey} válido`)
+      return
+    }
+    toast.error(`Contrato ${entityKey} inválido`)
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -164,6 +178,52 @@ function RewardsRulesPage() {
         />
         <StatCard icon={Trophy} label="Stock total" value={totalStock} hint="Inventario disponible" />
       </section>
+
+      <SectionCard
+        title="Step 2 - Contrato de datos Firebase"
+        description="Esquema canónico multi-tenant con validación previa a escritura en Firestore."
+        action={
+          <button
+            type="button"
+            onClick={() => runContractValidation('user')}
+            className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+          >
+            Validar schema user
+          </button>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-xl border border-secondary/20 bg-surface/70 p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Versión contrato</p>
+            <p className="mt-2 font-display text-xl font-semibold text-ink">{contractVersion}</p>
+          </article>
+          <article className="rounded-xl border border-secondary/20 bg-surface/70 p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Entidades</p>
+            <p className="mt-2 font-display text-xl font-semibold text-ink">
+              {Object.keys(dataContractSchemas).length}
+            </p>
+          </article>
+          <article className="rounded-xl border border-secondary/20 bg-surface/70 p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Colecciones</p>
+            <p className="mt-2 text-sm font-semibold text-ink">
+              {Object.values(dataContractSchemas)
+                .map((item) => item.collection)
+                .join(', ')}
+            </p>
+          </article>
+          <article className="rounded-xl border border-secondary/20 bg-surface/70 p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Último reporte</p>
+            {lastValidationReport ? (
+              <p className="mt-2 text-sm font-semibold text-ink">
+                {lastValidationReport.entityKey} ·{' '}
+                {lastValidationReport.valid ? 'válido' : 'inválido'}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-ink/70">Sin validaciones aún.</p>
+            )}
+          </article>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Rulebook principal"

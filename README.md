@@ -54,3 +54,22 @@ Se definen en `tailwind.config.js`.
 - `/visitas`
 - `/premios`
 - `/canjes`
+
+## Step 2 Implementado (Data Contract Firebase)
+
+- Contrato canónico multi-tenant: `tenants/{tenantId}/...`
+- Validadores de contrato por entidad antes de persistir
+- Factories con fechas custom `dayjs` (`createdAtCustom`, `updatedAtCustom`)
+- Repositorio Firestore para escritura/lectura consistente
+- Store de validación de contrato (`useLoyaltyDataContractStore`)
+
+Archivos principales:
+
+- `src/domain/loyalty/dataContract.js`
+- `src/domain/loyalty/dataContractValidators.js`
+- `src/domain/loyalty/dataFactories.js`
+- `src/services/loyaltyDataContractRepository.js`
+- `src/store/useLoyaltyDataContractStore.js`
+- `docs/STEP_2_DATA_CONTRACT.md`
+- `firebase/firestore.rules`
+- `firebase/firestore.indexes.json`
