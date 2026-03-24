@@ -32,7 +32,7 @@ function AppLayout() {
           items={navigationItems}
         />
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen flex-1 flex-col min-w-0">
           <Topbar
             title={currentMeta.title}
             description={currentMeta.description}

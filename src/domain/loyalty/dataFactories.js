@@ -151,3 +151,31 @@ export const createAuditLogRecord = ({ tenantId, actorId = 'system', ...input })
 
   return withAuditFields(base, actorId, !input.createdAtCustom)
 }
+
+export const createDailyUsageRecord = ({ tenantId, actorId = 'system', ...input }) => {
+  const base = {
+    usageId: input.usageId || createId('usage'),
+    tenantId,
+    userId: input.userId || '',
+    dayKey: input.dayKey || dayjs().format('YYYY-MM-DD'),
+    validScans: input.validScans ?? 0,
+    blockedScans: input.blockedScans ?? 0,
+    lastReason: input.lastReason || null,
+    lastScanAtCustom: input.lastScanAtCustom || null,
+  }
+
+  return withAuditFields(base, actorId, !input.createdAtCustom)
+}
+
+export const createUserRewardCounterRecord = ({ tenantId, actorId = 'system', ...input }) => {
+  const base = {
+    counterId: input.counterId || createId('counter'),
+    tenantId,
+    userId: input.userId || '',
+    rewardId: input.rewardId || '',
+    redeemCount: input.redeemCount ?? 0,
+    lastRedeemedAtCustom: input.lastRedeemedAtCustom || null,
+  }
+
+  return withAuditFields(base, actorId, !input.createdAtCustom)
+}

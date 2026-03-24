@@ -19,10 +19,12 @@ import {
 import {
   createAuditLogRecord,
   createCheckInRecord,
+  createDailyUsageRecord,
   createQrCodeRecord,
   createRedemptionRecord,
   createRewardRecord,
   createUserRecord,
+  createUserRewardCounterRecord,
   createWalletTransactionRecord,
 } from '../domain/loyalty/dataFactories'
 
@@ -34,6 +36,8 @@ const entityFactoryMap = {
   walletTransaction: createWalletTransactionRecord,
   redemption: createRedemptionRecord,
   auditLog: createAuditLogRecord,
+  dailyUsage: createDailyUsageRecord,
+  userRewardCounter: createUserRewardCounterRecord,
 }
 
 export const tenantDocumentRef = (db, tenantId) =>
@@ -146,4 +150,3 @@ export const listEntityRecords = async ({
     ...recordDoc.data(),
   }))
 }
-

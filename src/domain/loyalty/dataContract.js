@@ -17,6 +17,8 @@ export const TENANT_SUBCOLLECTIONS = {
   WALLET_TRANSACTIONS: 'walletTransactions',
   REDEMPTIONS: 'redemptions',
   AUDIT_LOGS: 'auditLogs',
+  DAILY_USAGE: 'dailyUsage',
+  USER_REWARD_COUNTERS: 'userRewardCounters',
 }
 
 export const LEDGER_TX_TYPES = {
@@ -156,11 +158,44 @@ export const dataContractSchemas = {
       rewardId: { type: 'string', required: true },
       requiredVisitsSnapshot: { type: 'number', required: true, min: 1 },
       status: { type: 'string', required: true, enum: Object.values(REDEMPTION_STATUS) },
+      rejectReason: {
+        type: 'string',
+        required: false,
+        enum: Object.values(REJECTION_REASON),
+      },
       requestedAtCustom: { type: 'string', required: true, format: 'customTimestamp' },
       approvedAtCustom: { type: 'string', required: false, format: 'customTimestamp' },
       deliveredAtCustom: { type: 'string', required: false, format: 'customTimestamp' },
       walletTxId: { type: 'string', required: false },
       notes: { type: 'string', required: false },
+      ...auditFields,
+    },
+  },
+  dailyUsage: {
+    collection: TENANT_SUBCOLLECTIONS.DAILY_USAGE,
+    idField: 'usageId',
+    fields: {
+      usageId: { type: 'string', required: true },
+      tenantId: { type: 'string', required: true },
+      userId: { type: 'string', required: true },
+      dayKey: { type: 'string', required: true },
+      validScans: { type: 'number', required: true, min: 0 },
+      blockedScans: { type: 'number', required: true, min: 0 },
+      lastReason: { type: 'string', required: false, enum: Object.values(REJECTION_REASON) },
+      lastScanAtCustom: { type: 'string', required: false, format: 'customTimestamp' },
+      ...auditFields,
+    },
+  },
+  userRewardCounter: {
+    collection: TENANT_SUBCOLLECTIONS.USER_REWARD_COUNTERS,
+    idField: 'counterId',
+    fields: {
+      counterId: { type: 'string', required: true },
+      tenantId: { type: 'string', required: true },
+      userId: { type: 'string', required: true },
+      rewardId: { type: 'string', required: true },
+      redeemCount: { type: 'number', required: true, min: 0 },
+      lastRedeemedAtCustom: { type: 'string', required: false, format: 'customTimestamp' },
       ...auditFields,
     },
   },
@@ -188,4 +223,3 @@ export const entityKeys = Object.keys(dataContractSchemas)
 export const collectionToEntityMap = Object.fromEntries(
   entityKeys.map((key) => [dataContractSchemas[key].collection, key]),
 )
-

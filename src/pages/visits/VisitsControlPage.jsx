@@ -1,72 +1,172 @@
-import { ClipboardList, ScanLine, Trophy, Clock3 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ClipboardList, Clock3, ScanLine, ShieldCheck, Trophy } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../../components/ui/PageHeader'
 import SectionCard from '../../components/ui/SectionCard'
 import StatCard from '../../components/ui/StatCard'
+import StatusBadge from '../../components/ui/StatusBadge'
 import TableCard from '../../components/ui/TableCard'
-import { visitsFeed } from '../../data/mvpData'
+import { useOperationsStore } from '../../store/useOperationsStore'
 
 const visitsColumns = [
-  { key: 'alumno', label: 'Alumno' },
-  { key: 'disciplina', label: 'Disciplina' },
-  { key: 'hora', label: 'Hora de escaneo' },
-  { key: 'canal', label: 'Canal QR' },
-  { key: 'progreso', label: 'Progreso premio' },
+  { key: 'userName', label: 'Alumno' },
+  { key: 'discipline', label: 'Disciplina' },
+  { key: 'scannedAtCustom', label: 'Hora' },
+  { key: 'qrCodeId', label: 'QR' },
+  { key: 'result', label: 'Resultado' },
 ]
 
 function VisitsControlPage() {
+  const users = useOperationsStore((state) => state.users)
+  const qrCampaigns = useOperationsStore((state) => state.qrCampaigns)
+  const checkIns = useOperationsStore((state) => state.checkIns)
+  const lastTransactionResult = useOperationsStore((state) => state.lastTransactionResult)
+  const recordCheckInOperation = useOperationsStore((state) => state.recordCheckInOperation)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [draft, setDraft] = useState({
+    userId: users[0]?.userId || '',
+    qrCodeId: qrCampaigns[0]?.qrCodeId || '',
+    classSessionId: '',
+    deviceId: 'frontdesk-web',
+  })
+
+  const validToday = checkIns.filter((item) => item.isValid).length
+  const blockedToday = checkIns.filter((item) => !item.isValid).length
+  const usersNearReward = users.filter((user) => user.visitBalanceCached >= 7).length
+
+  const formattedFeed = useMemo(
+    () =>
+      checkIns.map((entry) => ({
+        ...entry,
+        result: entry.isValid ? 'Aprobado' : entry.reason || 'Bloqueado',
+      })),
+    [checkIns],
+  )
+
+  const handleCheckIn = async (event) => {
+    event.preventDefault()
+    if (!draft.userId || !draft.qrCodeId) {
+      toast.error('Selecciona usuario y QR para registrar escaneo.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const result = await recordCheckInOperation(draft)
+      if (result.ok) {
+        toast.success(`Check-in registrado (+${result.awardedVisits || 1} visita).`)
+      } else {
+        toast.error(`Check-in bloqueado: ${result.reason || 'UNKNOWN'}`)
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Módulo 3"
-        title="Control de visitas por alumno"
-        description="Seguimiento diario de escaneos, validación de asistencia y avance hacia recompensas."
-        action={
-          <button
-            type="button"
-            onClick={() => toast.success('Escaneo manual listo para conectar con cámara/QR.')}
-            className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
-          >
-            <span className="inline-flex items-center gap-2">
-              <ScanLine size={16} /> Registrar escaneo
-            </span>
-          </button>
-        }
+        eyebrow="Módulo 3 · Step 4"
+        title="Operación de check-ins"
+        description="Registro transaccional de asistencias con validaciones de negocio y trazabilidad."
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ClipboardList} label="Escaneos hoy" value="43" hint="Hasta las 19:00" />
-        <StatCard icon={Trophy} label="Cerca de premio" value="17" hint="A 2 visitas o menos" />
-        <StatCard icon={Clock3} label="Hora pico" value="18:00" hint="Clase grupal" />
-        <StatCard icon={ScanLine} label="Errores QR" value="2" hint="Pendiente de validación" />
+        <StatCard icon={ClipboardList} label="Check-ins válidos" value={validToday} hint="Periodo actual" />
+        <StatCard icon={ShieldCheck} label="Check-ins bloqueados" value={blockedToday} hint="Con antifraude" />
+        <StatCard icon={Trophy} label="Cerca de premio" value={usersNearReward} hint=">= 7 visitas" />
+        <StatCard icon={Clock3} label="Última transacción" value={lastTransactionResult ? 'Reciente' : 'N/A'} hint={lastTransactionResult?.reason || 'Sin actividad'} />
       </section>
 
-      <SectionCard
-        title="Feed de asistencia"
-        description="Eventos de visita para monitoreo de operación en vivo."
-      >
-        <TableCard
-          columns={visitsColumns}
-          rows={visitsFeed}
-          emptyMessage="Aún no hay visitas registradas en este periodo."
-          renderCell={(column, row) => {
-            if (column === 'alumno') {
-              return (
-                <div>
-                  <p className="font-semibold text-ink">{row.alumno}</p>
-                  <p className="text-xs text-ink/60">{row.id}</p>
-                </div>
-              )
-            }
+      <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
+        <SectionCard
+          title="Registrar escaneo"
+          description="Usa este flujo para frontdesk o staff operativo."
+        >
+          <form onSubmit={handleCheckIn} className="space-y-3">
+            <select
+              value={draft.userId}
+              onChange={(event) =>
+                setDraft((previous) => ({ ...previous, userId: event.target.value }))
+              }
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
+            >
+              {users.map((user) => (
+                <option key={user.userId} value={user.userId}>
+                  {user.fullName} ({user.userId})
+                </option>
+              ))}
+            </select>
+            <select
+              value={draft.qrCodeId}
+              onChange={(event) =>
+                setDraft((previous) => ({ ...previous, qrCodeId: event.target.value }))
+              }
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
+            >
+              {qrCampaigns.map((qr) => (
+                <option key={qr.qrCodeId} value={qr.qrCodeId}>
+                  {qr.name} ({qr.qrCodeId})
+                </option>
+              ))}
+            </select>
+            <input
+              value={draft.classSessionId}
+              onChange={(event) =>
+                setDraft((previous) => ({ ...previous, classSessionId: event.target.value }))
+              }
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
+              placeholder="classSessionId opcional"
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
+            >
+              <span className="inline-flex items-center gap-2">
+                <ScanLine size={16} />
+                {isSubmitting ? 'Registrando...' : 'Registrar check-in'}
+              </span>
+            </button>
+          </form>
+        </SectionCard>
 
-            if (column === 'progreso') {
-              return <span className="font-semibold text-secondary">{row.progreso}</span>
-            }
+        <SectionCard
+          title="Feed operativo de asistencia"
+          description="Últimos eventos del motor transaccional de check-ins."
+        >
+          <TableCard
+            columns={visitsColumns}
+            rows={formattedFeed}
+            emptyMessage="Aún no hay transacciones de check-in registradas."
+            renderCell={(column, row) => {
+              if (column === 'userName') {
+                return (
+                  <div>
+                    <p className="font-semibold text-ink">{row.userName}</p>
+                    <p className="text-xs text-ink/60">{row.checkInId}</p>
+                  </div>
+                )
+              }
 
-            return row[column]
-          }}
-        />
-      </SectionCard>
+              if (column === 'scannedAtCustom') {
+                return row.scannedAtCustom?.split('T')[1]?.slice(0, 5) || '--:--'
+              }
+
+              if (column === 'result') {
+                return (
+                  <div className="space-y-1">
+                    <StatusBadge value={row.isValid ? 'Vigente' : 'Pausado'} />
+                    <p className="text-xs text-ink/65">{row.result}</p>
+                  </div>
+                )
+              }
+
+              return row[column]
+            }}
+          />
+        </SectionCard>
+      </section>
     </div>
   )
 }

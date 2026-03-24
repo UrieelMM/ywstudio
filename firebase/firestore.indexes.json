@@ -31,6 +31,22 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "requestedAtCustom", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "dailyUsage",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "dayKey", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userRewardCounters",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "rewardId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

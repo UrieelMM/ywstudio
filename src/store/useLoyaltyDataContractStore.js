@@ -7,10 +7,12 @@ import { validateEntityRecord } from '../domain/loyalty/dataContractValidators'
 import {
   createAuditLogRecord,
   createCheckInRecord,
+  createDailyUsageRecord,
   createQrCodeRecord,
   createRedemptionRecord,
   createRewardRecord,
   createUserRecord,
+  createUserRewardCounterRecord,
   createWalletTransactionRecord,
 } from '../domain/loyalty/dataFactories'
 import { create } from './initialStore'
@@ -23,6 +25,8 @@ const sampleFactoryMap = {
   walletTransaction: createWalletTransactionRecord,
   redemption: createRedemptionRecord,
   auditLog: createAuditLogRecord,
+  dailyUsage: createDailyUsageRecord,
+  userRewardCounter: createUserRewardCounterRecord,
 }
 
 const defaultInputs = {
@@ -67,6 +71,16 @@ const defaultInputs = {
     action: 'RULEBOOK_UPDATED',
     entityType: 'rulebook',
     entityId: 'default',
+  },
+  dailyUsage: {
+    userId: 'user_seed',
+    validScans: 1,
+    blockedScans: 0,
+  },
+  userRewardCounter: {
+    userId: 'user_seed',
+    rewardId: 'reward_seed',
+    redeemCount: 1,
   },
 }
 
@@ -125,4 +139,3 @@ export const useLoyaltyDataContractStore = create()((set, get) => ({
     return report
   },
 }))
-

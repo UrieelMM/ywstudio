@@ -73,3 +73,37 @@ Archivos principales:
 - `docs/STEP_2_DATA_CONTRACT.md`
 - `firebase/firestore.rules`
 - `firebase/firestore.indexes.json`
+
+## Step 3 Implementado (Motor transaccional)
+
+- Cloud Functions transaccionales en `functions/src/index.js`
+- Endpoints:
+  - `registerCheckIn`
+  - `redeemReward`
+- Idempotencia por `idempotencyKey`
+- Ledger en `walletTransactions`
+- Bloqueos antifraude + auditoría
+
+Documentación:
+
+- `docs/STEP_3_TRANSACTION_ENGINE.md`
+
+Deploy de Cloud Functions:
+
+```bash
+cd functions
+npm install
+cd ..
+firebase deploy --only functions
+```
+
+## Step 4 Implementado (Workflows operativos UI)
+
+- Store operativo transversal: `src/store/useOperationsStore.js`
+- Flujos activos en módulos:
+  - alta/cambio de estado de usuarios
+  - creación/pausa de campañas QR
+  - check-ins operativos
+  - configuración/canje de premios
+  - seguimiento y cierre de canjes
+- Documentación: `docs/STEP_4_OPERATION_WORKFLOWS.md`
