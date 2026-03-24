@@ -5,15 +5,30 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasTenantAccess(tenantId) {
-      return isAuthenticated() && request.auth.token.tenantId == tenantId;
+    // Permite operar con claim de tenant o con tenant fijo de proyecto.
+    function hasTenantClaim(tenantId) {
+      return request.auth.token.tenantId != null
+        && request.auth.token.tenantId == tenantId;
     }
 
-    function hasCustomAuditFields() {
+    function isProjectTenant(tenantId) {
+      return tenantId == 'tenant-ywstudio';
+    }
+
+    function hasTenantAccess(tenantId) {
+      return isAuthenticated() && (hasTenantClaim(tenantId) || isProjectTenant(tenantId));
+    }
+
+    function hasAuditFields() {
       return request.resource.data.createdAtCustom is string
         && request.resource.data.updatedAtCustom is string
         && request.resource.data.createdBy is string
         && request.resource.data.updatedBy is string;
+    }
+
+    function tenantMatches(tenantId) {
+      return request.resource.data.tenantId is string
+        && request.resource.data.tenantId == tenantId;
     }
 
     match /tenants/{tenantId} {
@@ -23,11 +38,10 @@ service cloud.firestore {
       match /{collectionName}/{docId} {
         allow read: if hasTenantAccess(tenantId);
 
-        // Escrituras por cliente solo como fallback controlado.
-        // Recomendado: ejecutar mutaciones críticas via Cloud Functions.
+        // Reglas base para escrituras del dashboard.
         allow create, update: if hasTenantAccess(tenantId)
-          && request.resource.data.tenantId == tenantId
-          && hasCustomAuditFields();
+          && tenantMatches(tenantId)
+          && hasAuditFields();
 
         allow delete: if false;
       }

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { X, Sparkles } from 'lucide-react'
+import { X } from 'lucide-react'
+import logo from '../../assets/ywstudio_logo.jpg'
 
 function MobileSidebar({ isOpen, onClose, items }) {
   if (!isOpen) {
@@ -14,8 +15,8 @@ function MobileSidebar({ isOpen, onClose, items }) {
       >
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-secondary p-2 text-white">
-              <Sparkles size={18} />
+            <span className="shrink-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-secondary/10">
+              <img src={logo} alt="YW Studio" className="h-9 w-9 object-cover" />
             </span>
             <div>
               <p className="font-display text-lg font-semibold text-ink">ywstudio</p>

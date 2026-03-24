@@ -40,6 +40,13 @@ Variables esperadas:
 npm run dev
 ```
 
+## 4) Activar Login (Firebase Auth)
+
+1. En Firebase Console entra a `Authentication > Sign-in method`.
+2. Habilita `Email/Password`.
+3. Crea al menos un usuario en `Authentication > Users`.
+4. Inicia sesión en `/login`.
+
 ## Colores de marca
 
 - `primary`: `#e0cec2`
@@ -107,3 +114,16 @@ firebase deploy --only functions
   - configuración/canje de premios
   - seguimiento y cierre de canjes
 - Documentación: `docs/STEP_4_OPERATION_WORKFLOWS.md`
+
+## Step 5 Implementado (Gobernanza y go-live)
+
+- KPIs de salud operativa y score de gobernanza
+- Gestión de fases de rollout (`pilot`, `controlled`, `full`)
+- Feature flags operativas
+- Checklist go-live con avance
+- Registro de incidentes y riesgos
+
+Documentación:
+
+- `docs/STEP_5_GOVERNANCE_AND_GOLIVE.md`
+- `docs/CANJES_TECNICO_GOBIERNO.md` (detalle técnico movido fuera de UI de canjes)
