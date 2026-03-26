@@ -564,7 +564,7 @@ function DashboardOverviewPage() {
         <StatCard icon={ScanLine} label="Asistencias validadas" value={validCheckIns.length} hint="Acumulado del programa" />
         <StatCard icon={ShieldCheck} label="Canjes efectivos" value={effectiveRedemptions.length} hint={`${deliveredRedemptions.length} entregados`} />
         <StatCard icon={Gift} label="Premios activos" value={activeRewards} hint={`${rewards.length} premios configurados`} />
-        <StatCard icon={ShoppingBag} label="Inventario disponible" value={totalStock} hint="Suma de stock finito" />
+        <StatCard icon={ShoppingBag} label="Inventario disponible" value={totalStock} hint="Suma de stock" />
         <StatCard icon={AlertTriangle} label="Premios con stock bajo" value={lowStockRewards.length} hint={`${outOfStockRewards.length} sin existencias`} />
         <StatCard icon={ChartNoAxesColumnIncreasing} label="Visitas promedio por alumno" value={avgVisitBalance} hint="Saldo actual promedio" />
       </section>
