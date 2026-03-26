@@ -33,6 +33,8 @@ Variables esperadas:
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
+- `VITE_PUBLIC_SCAN_BASE_URL` (opcional, para forzar dominio público de QR; default usa `window.location.origin`)
+- `VITE_FIREBASE_DATABASE_URL` (opcional, para Realtime Database; default usa `https://<projectId>-default-rtdb.firebaseio.com`)
 
 ## 3) Ejecutar en desarrollo
 
@@ -61,6 +63,7 @@ Se definen en `tailwind.config.js`.
 - `/visitas`
 - `/premios`
 - `/canjes`
+- `/scan/:qrCodeId` (pública para auto check-in por QR)
 
 ## Step 2 Implementado (Data Contract Firebase)
 
@@ -86,6 +89,7 @@ Archivos principales:
 - Cloud Functions transaccionales en `functions/src/index.js`
 - Endpoints:
   - `registerCheckIn`
+  - `registerCheckInByPublicIdentity` (público: `userId + email + qrCodeId`)
   - `redeemReward`
 - Idempotencia por `idempotencyKey`
 - Ledger en `walletTransactions`
@@ -102,6 +106,18 @@ cd functions
 npm install
 cd ..
 firebase deploy --only functions
+```
+
+## Realtime visits (RTDB + Firestore)
+
+- Las visitas (`checkIns`) se mantienen canónicas en Firestore.
+- Se publica un espejo en Realtime Database (`tenants/{tenantId}/checkInFeed`) para refresco instantáneo del dashboard.
+- El dashboard se suscribe en tiempo real al feed al iniciar sesión.
+
+Deploy recomendado para reglas:
+
+```bash
+firebase deploy --only firestore:rules,database,storage
 ```
 
 ## Step 4 Implementado (Workflows operativos UI)

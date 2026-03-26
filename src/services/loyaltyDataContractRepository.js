@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -22,6 +23,7 @@ import {
   createDailyUsageRecord,
   createQrCodeRecord,
   createRedemptionRecord,
+  createNotificationRecord,
   createRewardRecord,
   createUserRecord,
   createUserRewardCounterRecord,
@@ -38,6 +40,7 @@ const entityFactoryMap = {
   auditLog: createAuditLogRecord,
   dailyUsage: createDailyUsageRecord,
   userRewardCounter: createUserRewardCounterRecord,
+  notification: createNotificationRecord,
 }
 
 export const tenantDocumentRef = (db, tenantId) =>
@@ -149,4 +152,16 @@ export const listEntityRecords = async ({
     id: recordDoc.id,
     ...recordDoc.data(),
   }))
+}
+
+export const deleteEntityRecord = async ({
+  db,
+  tenantId,
+  entityKey,
+  entityId,
+}) => {
+  await deleteDoc(tenantEntityDocRef(db, tenantId, entityKey, entityId))
+  return {
+    entityId,
+  }
 }

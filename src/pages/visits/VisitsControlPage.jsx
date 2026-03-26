@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import dayjs from 'dayjs'
 import { ClipboardList, Clock3, ScanLine, ShieldCheck, Trophy } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../../components/ui/Modal'
@@ -8,6 +9,7 @@ import Spinner from '../../components/ui/Spinner'
 import StatCard from '../../components/ui/StatCard'
 import StatusBadge from '../../components/ui/StatusBadge'
 import TableCard from '../../components/ui/TableCard'
+import { getFriendlyReason, getLastTransactionHint } from '../../lib/loyaltyMessages'
 import { useOperationsStore } from '../../store/useOperationsStore'
 
 const visitsColumns = [
@@ -41,7 +43,7 @@ function VisitsControlPage() {
     () =>
       checkIns.map((entry) => ({
         ...entry,
-        result: entry.isValid ? 'Aprobado' : entry.reason || 'Bloqueado',
+        result: entry.isValid ? 'Asistencia validada' : getFriendlyReason(entry.reason),
       })),
     [checkIns],
   )
@@ -57,11 +59,11 @@ function VisitsControlPage() {
     try {
       const result = await recordCheckInOperation(draft)
       if (result.ok) {
-        toast.success(`Check-in registrado (+${result.awardedVisits || 1} visita).`)
+        toast.success(`Asistencia registrada (+${result.awardedVisits || 1} visita).`)
         setIsCreateModalOpen(false)
-        setDraft(prev => ({...prev, classSessionId: ''}))
+        setDraft((previous) => ({ ...previous, classSessionId: '' }))
       } else {
-        toast.error(`Check-in bloqueado: ${result.reason || 'UNKNOWN'}`)
+        toast.error(getFriendlyReason(result.reason))
       }
     } finally {
       setIsSubmitting(false)
@@ -71,14 +73,14 @@ function VisitsControlPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Módulo 3 · Step 4"
-        title="Operación de check-ins"
-        description="Registro transaccional de asistencias con validaciones de negocio y trazabilidad."
+        eyebrow="Asistencias"
+        title="Registro de asistencias"
+        description="Controla asistencias del día y registra clases manualmente cuando sea necesario."
         action={
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
-            className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+            className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 active:translate-y-0"
           >
             <span className="inline-flex items-center gap-2">
               <ScanLine size={16} /> Registrar escaneo
@@ -88,22 +90,27 @@ function VisitsControlPage() {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ClipboardList} label="Check-ins válidos" value={validToday} hint="Periodo actual" />
-        <StatCard icon={ShieldCheck} label="Check-ins bloqueados" value={blockedToday} hint="Con antifraude" />
+        <StatCard icon={ClipboardList} label="Asistencias válidas" value={validToday} hint="Periodo actual" />
+        <StatCard icon={ShieldCheck} label="Asistencias bloqueadas" value={blockedToday} hint="Requieren revisión" />
         <StatCard icon={Trophy} label="Cerca de premio" value={usersNearReward} hint=">= 7 visitas" />
-        <StatCard icon={Clock3} label="Última transacción" value={lastTransactionResult ? 'Reciente' : 'N/A'} hint={lastTransactionResult?.reason || 'Sin actividad'} />
+        <StatCard
+          icon={Clock3}
+          label="Última operación"
+          value={lastTransactionResult ? 'Reciente' : 'Sin actividad'}
+          hint={getLastTransactionHint(lastTransactionResult)}
+        />
       </section>
 
       <section className="grid gap-6 items-start">
 
         <SectionCard
-          title="Feed operativo de asistencia"
-          description="Últimos eventos del motor transaccional de check-ins."
+          title="Historial de asistencias"
+          description="Últimos registros validados y bloqueados."
         >
           <TableCard
             columns={visitsColumns}
             rows={formattedFeed}
-            emptyMessage="Aún no hay transacciones de check-in registradas."
+            emptyMessage="Aún no hay asistencias registradas."
             renderCell={(column, row) => {
               if (column === 'userName') {
                 return (
@@ -115,13 +122,14 @@ function VisitsControlPage() {
               }
 
               if (column === 'scannedAtCustom') {
-                return row.scannedAtCustom?.split('T')[1]?.slice(0, 5) || '--:--'
+                const parsed = dayjs(row.scannedAtCustom)
+                return parsed.isValid() ? parsed.format('HH:mm') : '--:--'
               }
 
               if (column === 'result') {
                 return (
                   <div className="space-y-1">
-                    <StatusBadge value={row.isValid ? 'Vigente' : 'Pausado'} />
+                    <StatusBadge value={row.isValid ? 'Aprobado' : 'Bloqueado'} />
                     <p className="text-xs text-ink/65">{row.result}</p>
                   </div>
                 )
@@ -137,7 +145,7 @@ function VisitsControlPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Registrar escaneo"
-        subtitle="Usa este flujo para frontdesk o staff operativo."
+        subtitle="Usa este formulario cuando el registro se haga manualmente en recepción."
         size="max-w-xl"
       >
         <form onSubmit={handleCheckIn} className="space-y-3">
@@ -151,7 +159,7 @@ function VisitsControlPage() {
               onChange={(event) =>
                 setDraft((previous) => ({ ...previous, userId: event.target.value }))
               }
-              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
               required
             >
               {users.map((user) => (
@@ -172,7 +180,7 @@ function VisitsControlPage() {
               onChange={(event) =>
                 setDraft((previous) => ({ ...previous, qrCodeId: event.target.value }))
               }
-              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
               required
             >
               {qrCampaigns.map((qr) => (
@@ -196,17 +204,17 @@ function VisitsControlPage() {
               onChange={(event) =>
                 setDraft((previous) => ({ ...previous, classSessionId: event.target.value }))
               }
-              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
               placeholder="Opcional, ej. ballet-2026-04-10-07am"
             />
           </div>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-80"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-80 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
           >
             {isSubmitting ? <Spinner className="h-4 w-4 text-white" /> : <ScanLine size={16} />}
-            <span>{isSubmitting ? 'Registrando...' : 'Registrar check-in'}</span>
+            <span>{isSubmitting ? 'Registrando...' : 'Registrar asistencia'}</span>
           </button>
         </form>
       </Modal>

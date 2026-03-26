@@ -7,9 +7,13 @@ function Modal({ isOpen, title, subtitle, onClose, children, size = 'max-w-2xl' 
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/20 p-4 backdrop-blur-md"
+      onClick={onClose}
+    >
       <div
         className={`w-full ${size} overflow-hidden rounded-2xl border border-secondary/20 bg-white shadow-2xl`}
+        onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between border-b border-secondary/20 bg-shell px-4 py-3 sm:px-5">
           <div>

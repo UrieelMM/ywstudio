@@ -8,7 +8,7 @@ function MobileSidebar({ isOpen, onClose, items }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink/35 lg:hidden" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-ink/20 backdrop-blur-md xl:hidden" onClick={onClose}>
       <div
         className="h-full w-[84%] max-w-[320px] bg-shell p-4 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -16,10 +16,10 @@ function MobileSidebar({ isOpen, onClose, items }) {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="shrink-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-secondary/10">
-              <img src={logo} alt="YW Studio" className="h-9 w-9 object-cover" />
+              <img src={logo} alt="YW Studio" className="h-12 w-12 object-cover" />
             </span>
             <div>
-              <p className="font-display text-lg font-semibold text-ink">ywstudio</p>
+              <p className="font-display text-2xl font-normal text-ink" style={{ letterSpacing: '0.5px' }}>ywstudio</p>
               <p className="text-xs text-ink/60">Loyalty Dashboard</p>
             </div>
           </div>

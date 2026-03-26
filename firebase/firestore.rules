@@ -34,17 +34,34 @@ service cloud.firestore {
     match /tenants/{tenantId} {
       allow read: if hasTenantAccess(tenantId);
       allow create, update, delete: if false;
+    }
 
-      match /{collectionName}/{docId} {
-        allow read: if hasTenantAccess(tenantId);
+    // Usuarios del programa
+    match /tenants/{tenantId}/users/{userId} {
+      allow read: if hasTenantAccess(tenantId);
+      allow create, update: if hasTenantAccess(tenantId)
+        && tenantMatches(tenantId)
+        && hasAuditFields();
+      allow delete: if hasTenantAccess(tenantId);
+    }
 
-        // Reglas base para escrituras del dashboard.
-        allow create, update: if hasTenantAccess(tenantId)
-          && tenantMatches(tenantId)
-          && hasAuditFields();
+    // Campañas QR (lectura pública para /scan/:qrCodeId)
+    match /tenants/{tenantId}/qrCodes/{qrCodeId} {
+      allow read: if hasTenantAccess(tenantId)
+        || isProjectTenant(tenantId);
+      allow create, update: if hasTenantAccess(tenantId)
+        && tenantMatches(tenantId)
+        && hasAuditFields();
+      allow delete: if hasTenantAccess(tenantId);
+    }
 
-        allow delete: if false;
-      }
+    // Otras colecciones operativas del tenant
+    match /tenants/{tenantId}/{collectionName}/{docId} {
+      allow read: if hasTenantAccess(tenantId);
+      allow create, update: if hasTenantAccess(tenantId)
+        && tenantMatches(tenantId)
+        && hasAuditFields();
+      allow delete: if hasTenantAccess(tenantId);
     }
   }
 }

@@ -19,6 +19,7 @@ export const TENANT_SUBCOLLECTIONS = {
   AUDIT_LOGS: 'auditLogs',
   DAILY_USAGE: 'dailyUsage',
   USER_REWARD_COUNTERS: 'userRewardCounters',
+  NOTIFICATIONS: 'notifications',
 }
 
 export const LEDGER_TX_TYPES = {
@@ -63,6 +64,7 @@ export const dataContractSchemas = {
       fullName: { type: 'string', required: true, minLength: 4 },
       phoneE164: { type: 'string', required: true, pattern: '^\\+[1-9]\\d{7,14}$' },
       email: { type: 'string', required: false },
+      profileImageUrl: { type: 'string', required: false },
       birthDate: { type: 'string', required: false, format: 'isoDate' },
       disciplineIds: { type: 'array', required: true, minItems: 1, itemType: 'string' },
       status: { type: 'string', required: true, enum: Object.values(USER_STATUS) },
@@ -99,6 +101,7 @@ export const dataContractSchemas = {
       tenantId: { type: 'string', required: true },
       name: { type: 'string', required: true, minLength: 3 },
       description: { type: 'string', required: false },
+      rewardImageUrl: { type: 'string', required: false },
       requiredVisits: { type: 'number', required: true, min: 1 },
       stockType: { type: 'string', required: true, enum: Object.values(STOCK_TYPE) },
       stockAvailable: { type: 'number', required: true, min: 0 },
@@ -213,6 +216,24 @@ export const dataContractSchemas = {
       after: { type: 'object', required: false },
       ip: { type: 'string', required: false },
       userAgent: { type: 'string', required: false },
+      ...auditFields,
+    },
+  },
+  notification: {
+    collection: TENANT_SUBCOLLECTIONS.NOTIFICATIONS,
+    idField: 'notificationId',
+    fields: {
+      notificationId: { type: 'string', required: true },
+      tenantId: { type: 'string', required: true },
+      type: { type: 'string', required: true },
+      title: { type: 'string', required: true, minLength: 2 },
+      message: { type: 'string', required: true, minLength: 2 },
+      userId: { type: 'string', required: false },
+      rewardId: { type: 'string', required: false },
+      checkInId: { type: 'string', required: false },
+      isRead: { type: 'boolean', required: true },
+      readAtCustom: { type: 'string', required: false, format: 'customTimestamp' },
+      metadata: { type: 'object', required: false },
       ...auditFields,
     },
   },

@@ -1,6 +1,6 @@
 function SectionCard({ title, description, action, children }) {
   return (
-    <section className="rounded-2xl border border-secondary/15 bg-white p-5 shadow-soft sm:p-6">
+    <section className="w-full min-w-0 rounded-2xl border border-secondary/15 bg-white p-5 shadow-soft sm:p-6">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight text-ink">

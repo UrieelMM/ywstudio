@@ -34,6 +34,7 @@ export const createUserRecord = ({ tenantId, actorId = 'system', ...input }) => 
     fullName: input.fullName || normalizeFullName(input.firstName || '', input.lastName || ''),
     phoneE164: input.phoneE164 || '',
     email: input.email || '',
+    profileImageUrl: input.profileImageUrl || '',
     birthDate: input.birthDate || null,
     disciplineIds: Array.isArray(input.disciplineIds) ? input.disciplineIds : [],
     status: input.status || USER_STATUS.ACTIVE,
@@ -70,6 +71,7 @@ export const createRewardRecord = ({ tenantId, actorId = 'system', ...input }) =
     tenantId,
     name: input.name || '',
     description: input.description || '',
+    rewardImageUrl: input.rewardImageUrl || '',
     requiredVisits: input.requiredVisits ?? 8,
     stockType: input.stockType || STOCK_TYPE.FINITE,
     stockAvailable: input.stockAvailable ?? 0,
@@ -175,6 +177,24 @@ export const createUserRewardCounterRecord = ({ tenantId, actorId = 'system', ..
     rewardId: input.rewardId || '',
     redeemCount: input.redeemCount ?? 0,
     lastRedeemedAtCustom: input.lastRedeemedAtCustom || null,
+  }
+
+  return withAuditFields(base, actorId, !input.createdAtCustom)
+}
+
+export const createNotificationRecord = ({ tenantId, actorId = 'system', ...input }) => {
+  const base = {
+    notificationId: input.notificationId || createId('ntf'),
+    tenantId,
+    type: input.type || 'system',
+    title: input.title || '',
+    message: input.message || '',
+    userId: input.userId || null,
+    rewardId: input.rewardId || null,
+    checkInId: input.checkInId || null,
+    isRead: input.isRead ?? false,
+    readAtCustom: input.readAtCustom || null,
+    metadata: input.metadata || null,
   }
 
   return withAuditFields(base, actorId, !input.createdAtCustom)

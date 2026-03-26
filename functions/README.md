@@ -3,6 +3,7 @@
 ## Funciones incluidas (Step 3)
 
 - `registerCheckIn`
+- `registerCheckInByPublicIdentity`
 - `redeemReward`
 
 ## Comandos
@@ -21,4 +22,4 @@ Estas funciones usan:
 - idempotencia por `idempotencyKey`
 - timestamps custom con `dayjs`
 - auditoría y ledger
-
+- publicación en Realtime Database para feed de visitas en vivo

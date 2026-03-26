@@ -14,8 +14,14 @@ function AppLayout() {
   const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const bootstrapData = useOperationsStore((state) => state.bootstrapData)
+  const startUsersRealtimeSync = useOperationsStore((state) => state.startUsersRealtimeSync)
+  const stopUsersRealtimeSync = useOperationsStore((state) => state.stopUsersRealtimeSync)
+  const startCheckInsRealtimeSync = useOperationsStore((state) => state.startCheckInsRealtimeSync)
+  const stopCheckInsRealtimeSync = useOperationsStore((state) => state.stopCheckInsRealtimeSync)
+  const startNotificationsRealtimeSync = useOperationsStore((state) => state.startNotificationsRealtimeSync)
+  const stopNotificationsRealtimeSync = useOperationsStore((state) => state.stopNotificationsRealtimeSync)
   const bootstrapGovernanceData = useGovernanceStore((state) => state.bootstrapGovernanceData)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isPreparingData, setIsPreparingData] = useState(true)
 
@@ -54,13 +60,32 @@ function AppLayout() {
       if (mounted) {
         setIsPreparingData(false)
       }
+
+      if (operationsResult?.ok) {
+        startUsersRealtimeSync()
+        startCheckInsRealtimeSync()
+        startNotificationsRealtimeSync()
+      }
     }
 
     loadData()
     return () => {
       mounted = false
+      stopUsersRealtimeSync()
+      stopCheckInsRealtimeSync()
+      stopNotificationsRealtimeSync()
     }
-  }, [user?.uid, bootstrapData, bootstrapGovernanceData])
+  }, [
+    user?.uid,
+    bootstrapData,
+    bootstrapGovernanceData,
+    startUsersRealtimeSync,
+    stopUsersRealtimeSync,
+    startCheckInsRealtimeSync,
+    stopCheckInsRealtimeSync,
+    startNotificationsRealtimeSync,
+    stopNotificationsRealtimeSync,
+  ])
 
   if (isPreparingData) {
     return (

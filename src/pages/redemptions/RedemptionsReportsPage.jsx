@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import dayjs from 'dayjs'
 import {
-  AlertTriangle,
+  Bell,
   Download,
   FileBarChart,
   History,
@@ -15,6 +16,7 @@ import StatCard from '../../components/ui/StatCard'
 import StatusBadge from '../../components/ui/StatusBadge'
 import TableCard from '../../components/ui/TableCard'
 import { formatDayMonth } from '../../lib/dateFormat'
+import { getFriendlyReason, getFriendlyRedemptionStatus } from '../../lib/loyaltyMessages'
 import { useGovernanceStore } from '../../store/useGovernanceStore'
 import { useOperationsStore } from '../../store/useOperationsStore'
 
@@ -26,30 +28,28 @@ const redemptionColumns = [
   { key: 'requestedAtCustom', label: 'Fecha' },
 ]
 
+const getRedemptionBadge = (status) => {
+  if (status === 'approved') {
+    return 'Pendiente de entrega'
+  }
+  return getFriendlyRedemptionStatus(status)
+}
+
 function RedemptionsReportsPage() {
   const users = useOperationsStore((state) => state.users)
   const rewards = useOperationsStore((state) => state.rewards)
   const checkIns = useOperationsStore((state) => state.checkIns)
   const redemptions = useOperationsStore((state) => state.redemptions)
+  const notifications = useOperationsStore((state) => state.notifications)
   const resolveRedemptionStatus = useOperationsStore((state) => state.resolveRedemptionStatus)
-  const activityFeed = useOperationsStore((state) => state.activityFeed)
 
-  const riskRegister = useGovernanceStore((state) => state.riskRegister)
-  const incidentLog = useGovernanceStore((state) => state.incidentLog)
   const lastReview = useGovernanceStore((state) => state.lastReview)
-  const updateRiskStatus = useGovernanceStore((state) => state.updateRiskStatus)
-  const addIncident = useGovernanceStore((state) => state.addIncident)
-  const resolveIncident = useGovernanceStore((state) => state.resolveIncident)
   const runGovernanceReview = useGovernanceStore((state) => state.runGovernanceReview)
-  const [incidentDraft, setIncidentDraft] = useState({
-    title: '',
-    severity: 'medium',
-    summary: '',
-  })
 
   const approved = redemptions.filter((entry) => entry.status === 'approved').length
   const delivered = redemptions.filter((entry) => entry.status === 'delivered').length
   const rejected = redemptions.filter((entry) => entry.status === 'rejected').length
+  const unreadNotifications = notifications.filter((entry) => !entry.isRead).length
 
   const liveMetrics = useMemo(
     () =>
@@ -62,7 +62,10 @@ function RedemptionsReportsPage() {
     [users, rewards, checkIns, redemptions],
   )
 
-  const activeIncidents = incidentLog.filter((incident) => incident.status === 'open').length
+  const recentNotifications = useMemo(
+    () => [...notifications].sort((a, b) => dayjs(b.createdAtCustom).valueOf() - dayjs(a.createdAtCustom).valueOf()).slice(0, 10),
+    [notifications],
+  )
 
   const handleRunReview = () => {
     const metrics = runGovernanceReview({
@@ -71,48 +74,28 @@ function RedemptionsReportsPage() {
       checkIns,
       redemptions,
     })
-    toast.success(`Revisión ejecutada. Score ${metrics.score}%`)
-  }
-
-  const handleCreateIncident = (event) => {
-    event.preventDefault()
-    if (!incidentDraft.title.trim() || !incidentDraft.summary.trim()) {
-      toast.error('Completa título y resumen del incidente.')
-      return
-    }
-    const saveIncident = async () => {
-      const result = await addIncident(incidentDraft, 'ops-ui')
-      if (!result.ok) {
-        toast.error(result.message || 'No fue posible registrar el incidente.')
-        return
-      }
-
-      setIncidentDraft({ title: '', severity: 'medium', summary: '' })
-      toast.success('Incidente registrado.')
-    }
-
-    saveIncident()
+    toast.success(`Indicadores actualizados. Salud general: ${metrics.score}%.`)
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Módulo 5 · Step 5"
-        title="Canjes, reportes e inteligencia operativa"
-        description="Control operativo de canjes, salud del programa y seguimiento de incidentes."
+        eyebrow="Reportes"
+        title="Canjes e historial"
+        description="Da seguimiento a canjes y al estado general del programa."
         action={
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleRunReview}
-              className="rounded-xl border border-secondary/30 bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-secondary/60"
+              className="rounded-xl border border-secondary/30 bg-white px-4 py-2 text-sm font-semibold text-ink shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:bg-secondary/5 hover:border-secondary/60 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 active:translate-y-0"
             >
-              Ejecutar revisión
+              Actualizar indicadores
             </button>
             <button
               type="button"
               onClick={() => toast.success('Exportación lista para conectar a CSV/PDF.')}
-              className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+              className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 active:translate-y-0"
             >
               <span className="inline-flex items-center gap-2">
                 <Download size={16} /> Exportar
@@ -127,18 +110,18 @@ function RedemptionsReportsPage() {
         <StatCard icon={PackageCheck} label="Aprobados" value={approved} hint="Pendientes de entrega" />
         <StatCard icon={ShieldCheck} label="Entregados" value={delivered} hint="Cierre operativo" />
         <StatCard icon={FileBarChart} label="Rechazados" value={rejected} hint="Con bloqueo aplicado" />
-        <StatCard icon={AlertTriangle} label="Incidentes abiertos" value={activeIncidents} hint="Requieren atención" />
+        <StatCard icon={Bell} label="Notificaciones sin leer" value={unreadNotifications} hint="Revisar en el header" />
       </section>
 
       <SectionCard
-        title="KPIs de gobernanza"
-        description="Métricas premium para salud operativa y riesgo de producción."
+        title="Salud del programa"
+        description="Indicadores clave para monitorear el rendimiento del plan de lealtad."
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {liveMetrics.kpis.map((kpi) => (
             <article
               key={kpi.id}
-              className="rounded-xl border border-secondary/20 bg-surface/70 p-4"
+              className="rounded-xl border border-secondary/15 bg-surface/70 p-4 shadow-sm transition-shadow duration-300 hover:shadow-soft"
             >
               <p className="text-xs uppercase tracking-[0.14em] text-ink/60">{kpi.label}</p>
               <p className="mt-2 font-display text-2xl font-semibold text-ink">
@@ -148,7 +131,7 @@ function RedemptionsReportsPage() {
               <div className="mt-2">
                 <StatusBadge value={kpi.status} />
               </div>
-              <p className="mt-2 text-xs text-ink/65">Target {kpi.target}%</p>
+              <p className="mt-2 text-xs text-ink/65">Meta: {kpi.target}%</p>
             </article>
           ))}
         </div>
@@ -163,7 +146,7 @@ function RedemptionsReportsPage() {
       <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <SectionCard
           title="Bitácora de canjes"
-          description="Panel de seguimiento con cambios de estado en un clic."
+          description="Seguimiento de canjes con actualización rápida de estado."
         >
           <TableCard
             columns={redemptionColumns}
@@ -180,35 +163,44 @@ function RedemptionsReportsPage() {
               }
 
               if (column === 'status') {
-                const statusLabel =
-                  row.status === 'approved'
-                    ? 'Pendiente'
-                    : row.status === 'delivered'
-                      ? 'Entregado'
-                      : 'Pausado'
-
                 return (
-                  <div className="flex items-center gap-2">
-                    <StatusBadge value={statusLabel} />
-                    {row.status !== 'delivered' ? (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const result = await resolveRedemptionStatus(
-                            row.redemptionId,
-                            'delivered',
-                            'admin-ui',
-                          )
-                          if (!result?.ok) {
-                            toast.error(result?.message || 'No fue posible actualizar el canje.')
-                            return
-                          }
-                          toast.success('Canje marcado como entregado.')
-                        }}
-                        className="rounded-lg border border-secondary/25 bg-white px-2 py-1 text-xs font-semibold text-ink"
-                      >
-                        Entregar
-                      </button>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <StatusBadge value={getRedemptionBadge(row.status)} />
+                      {row.status === 'approved' ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const result = await resolveRedemptionStatus(
+                              row.redemptionId,
+                              'delivered',
+                              'admin-ui',
+                            )
+                            if (!result?.ok) {
+                              toast.error(result?.message || 'No fue posible actualizar el canje.')
+                              return
+                            }
+                            toast.success('Canje marcado como entregado.')
+                          }}
+                          className="rounded-lg border border-secondary/25 bg-white px-2 py-1 text-xs font-semibold text-ink shadow-sm transition-all duration-200 hover:bg-secondary/5 hover:border-secondary/40 focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                        >
+                          Entregar
+                        </button>
+                      ) : null}
+                    </div>
+                    {row.status === 'rejected' && row.reason ? (
+                      <p className="text-xs text-ink/70">{getFriendlyReason(row.reason)}</p>
+                    ) : null}
+                  </div>
+                )
+              }
+
+              if (column === 'rewardName') {
+                return (
+                  <div>
+                    <p className="font-semibold text-ink">{row.rewardName}</p>
+                    {row.reason ? (
+                      <p className="text-xs text-ink/60">Motivo: {getFriendlyReason(row.reason)}</p>
                     ) : null}
                   </div>
                 )
@@ -225,169 +217,27 @@ function RedemptionsReportsPage() {
 
         <SectionCard
           title="Actividad reciente"
-          description="Eventos operativos más recientes del sistema."
+          description="Eventos importantes del programa para el equipo."
         >
           <div className="space-y-2">
-            {activityFeed.slice(0, 8).map((activity) => (
-              <article
-                key={activity.id}
-                className="rounded-xl border border-secondary/20 bg-surface/70 px-3 py-2"
-              >
-                <p className="text-sm font-semibold text-ink">{activity.message}</p>
-                <p className="text-xs text-ink/60">{formatDayMonth(activity.createdAtCustom)}</p>
-              </article>
-            ))}
-          </div>
-        </SectionCard>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-2">
-        <SectionCard
-          title="Incidentes"
-          description="Registro y resolución de incidentes operativos."
-        >
-          <form onSubmit={handleCreateIncident} className="mb-4 space-y-3">
-            <div className="space-y-1">
-              <label
-                htmlFor="incidentTitle"
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65"
-              >
-                Título del incidente *
-              </label>
-              <input
-                id="incidentTitle"
-                value={incidentDraft.title}
-                onChange={(event) =>
-                  setIncidentDraft((previous) => ({ ...previous, title: event.target.value }))
-                }
-                className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
-                placeholder="Ej. Error de stock al aprobar canje"
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label
-                htmlFor="incidentSeverity"
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65"
-              >
-                Severidad *
-              </label>
-              <select
-                id="incidentSeverity"
-                value={incidentDraft.severity}
-                onChange={(event) =>
-                  setIncidentDraft((previous) => ({ ...previous, severity: event.target.value }))
-                }
-                className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
-                required
-              >
-                <option value="low">Baja</option>
-                <option value="medium">Media</option>
-                <option value="high">Alta</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label
-                htmlFor="incidentSummary"
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65"
-              >
-                Resumen operativo *
-              </label>
-              <textarea
-                id="incidentSummary"
-                value={incidentDraft.summary}
-                onChange={(event) =>
-                  setIncidentDraft((previous) => ({ ...previous, summary: event.target.value }))
-                }
-                className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink"
-                placeholder="Describe el impacto, alcance y estado actual del incidente."
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
-            >
-              Crear incidente
-            </button>
-          </form>
-
-          <div className="space-y-2">
-            {incidentLog.length ? (
-              incidentLog.map((incident) => (
+            {recentNotifications.length ? (
+              recentNotifications.map((notification) => (
                 <article
-                  key={incident.id}
-                  className="rounded-xl border border-secondary/20 bg-surface/70 p-3"
+                  key={notification.notificationId}
+                  className="rounded-xl border border-secondary/15 bg-surface/70 px-3 py-2 shadow-sm transition-all duration-300 hover:shadow-soft hover:border-secondary/30"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">{incident.title}</p>
-                      <p className="text-xs text-ink/60">
-                        {incident.severity} · {formatDayMonth(incident.createdAtCustom)}
-                      </p>
-                    </div>
-                    <StatusBadge value={incident.status === 'open' ? 'Bloqueado' : 'Entregado'} />
-                  </div>
-                  <p className="mt-2 text-sm text-ink/75">{incident.summary}</p>
-                  {incident.status === 'open' ? (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const result = await resolveIncident(incident.id, 'ops-ui')
-                        if (!result?.ok) {
-                          toast.error(result?.message || 'No fue posible resolver el incidente.')
-                          return
-                        }
-                        toast.success('Incidente resuelto.')
-                      }}
-                      className="mt-2 rounded-lg border border-secondary/25 bg-white px-2 py-1 text-xs font-semibold text-ink"
-                    >
-                      Resolver
-                    </button>
-                  ) : null}
+                  <p className="text-sm font-semibold text-ink">{notification.title}</p>
+                  <p className="text-xs text-ink/70">{notification.message}</p>
+                  <p className="mt-1 text-xs text-ink/60">
+                    {dayjs(notification.createdAtCustom).format('DD MMM YYYY · HH:mm')}
+                  </p>
                 </article>
               ))
             ) : (
               <p className="rounded-xl border border-dashed border-secondary/30 bg-surface/60 p-4 text-sm text-ink/70">
-                No hay incidentes registrados.
+                Aún no hay actividad relevante para mostrar.
               </p>
             )}
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Registro de riesgos"
-          description="Seguimiento de riesgos de negocio y mitigación."
-        >
-          <div className="space-y-2">
-            {riskRegister.map((risk) => (
-              <article
-                key={risk.id}
-                className="rounded-xl border border-secondary/20 bg-surface/70 p-3"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{risk.title}</p>
-                    <p className="text-xs text-ink/60">Severidad: {risk.severity}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge value={risk.status === 'open' ? 'Riesgo' : 'Entregado'} />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateRiskStatus(risk.id, risk.status === 'open' ? 'mitigated' : 'open', 'ops-ui')
-                      }
-                      className="rounded-lg border border-secondary/25 bg-white px-2 py-1 text-xs font-semibold text-ink"
-                    >
-                      {risk.status === 'open' ? 'Mitigar' : 'Reabrir'}
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-2 text-sm text-ink/75">{risk.mitigation}</p>
-              </article>
-            ))}
           </div>
         </SectionCard>
       </section>
@@ -396,3 +246,4 @@ function RedemptionsReportsPage() {
 }
 
 export default RedemptionsReportsPage
+

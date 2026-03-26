@@ -7,6 +7,7 @@ import LoginPage from '../pages/auth/LoginPage'
 import QrManagementPage from '../pages/qr/QrManagementPage'
 import RedemptionsReportsPage from '../pages/redemptions/RedemptionsReportsPage'
 import RewardsRulesPage from '../pages/rewards/RewardsRulesPage'
+import PublicQrScanPage from '../pages/scan/PublicQrScanPage'
 import UsersPage from '../pages/users/UsersPage'
 import VisitsControlPage from '../pages/visits/VisitsControlPage'
 
@@ -14,6 +15,10 @@ const router = createBrowserRouter([
   {
     element: <AuthBootstrap />,
     children: [
+      {
+        path: '/scan/:qrCodeId',
+        element: <PublicQrScanPage />,
+      },
       {
         path: '/login',
         element: <PublicOnlyRoute />,

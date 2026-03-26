@@ -1,0 +1,44 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasTenantClaim(tenantId) {
+      return request.auth.token.tenantId != null
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    function isProjectTenant(tenantId) {
+      return tenantId == 'tenant-ywstudio';
+    }
+
+    function hasTenantAccess(tenantId) {
+      return isAuthenticated() && (hasTenantClaim(tenantId) || isProjectTenant(tenantId));
+    }
+
+    function isImageUpload() {
+      return request.resource != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Estructura esperada:
+    // tenants/{tenantId}/users/{userId}/{fileName}
+    // tenants/{tenantId}/rewards/{rewardId}/{fileName}
+    match /tenants/{tenantId}/{entityType}/{entityId}/{fileName} {
+      allow read: if true;
+      allow create, update: if hasTenantAccess(tenantId)
+        && (entityType == 'users' || entityType == 'rewards')
+        && isImageUpload();
+      allow delete: if hasTenantAccess(tenantId)
+        && (entityType == 'users' || entityType == 'rewards');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

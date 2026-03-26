@@ -5,18 +5,18 @@ import logo from '../../assets/ywstudio_logo.jpg'
 function Sidebar({ collapsed, onToggle, items }) {
   return (
     <aside
-      className={`h-full hidden flex-col overflow-y-auto border-r border-secondary/20 bg-shell/90 px-3 py-4 backdrop-blur lg:flex transition-all duration-300 shrink-0 ${
+      className={`h-full hidden flex-col overflow-y-auto border-r border-secondary/20 bg-white px-3 py-4 backdrop-blur xl:flex transition-all duration-300 shrink-0 ${
         collapsed ? 'w-[88px] items-center' : 'w-[290px]'
       }`}
     >
       <div className={`mb-6 flex w-full items-center ${collapsed ? 'flex-col gap-4' : 'justify-between px-2'}`}>
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-3">
           <span className="shrink-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-secondary/10">
-            <img src={logo} alt="YW Studio" className="h-8 w-8 object-cover" />
+            <img src={logo} alt="YW Studio" className="h-12 w-12 object-cover" />
           </span>
           {!collapsed ? (
             <div className="min-w-0">
-              <p className="truncate font-display text-lg font-semibold text-ink">ywstudio</p>
+              <p className="truncate font-display text-2xl font-normal text-ink" style={{ letterSpacing: '0.5px' }}>ywstudio</p>
               <p className="truncate text-xs text-ink/60">Loyalty Program</p>
             </div>
           ) : null}

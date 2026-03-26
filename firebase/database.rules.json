@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "tenants": {
+      "$tenantId": {
+        "checkInFeed": {
+          ".read": "auth != null",
+          ".write": false,
+          "$checkInId": {
+            ".validate": "newData.hasChildren(['checkInId', 'tenantId', 'userId', 'qrCodeId', 'scannedAtCustom', 'isValid'])"
+          }
+        }
+      }
+    },
+    ".read": false,
+    ".write": false
+  }
+}

@@ -2,16 +2,44 @@ import dayjs from 'dayjs'
 import { db } from '../lib/firebase'
 import {
   createEntityRecord,
+  deleteEntityRecord,
   listEntityRecords,
   upsertEntityRecord,
 } from '../services/loyaltyDataContractRepository'
+import { subscribeCheckInFeed } from '../services/checkInRealtimeService'
+import { subscribeNotificationsFeed } from '../services/notificationsRealtimeService'
+import { subscribeUsersFeed } from '../services/usersRealtimeService'
 import { runCheckInTransaction, runRedeemTransaction } from '../services/loyaltyTransactionsService'
+import { getFriendlyReason } from '../lib/loyaltyMessages'
 import { create } from './initialStore'
 
 const nowCustom = () => dayjs().format('YYYY-MM-DDTHH:mm:ss.SSSZ')
 
 const createId = (prefix) =>
   `${prefix}_${dayjs().format('YYYYMMDDHHmmss')}_${Math.random().toString(36).slice(2, 6)}`
+
+const USER_CODE_PREFIX = 'ywstudio-'
+const USER_CODE_REGEX = /^ywstudio-(\d{4,})$/
+
+const parseUserSequence = (userId) => {
+  const match = USER_CODE_REGEX.exec(String(userId || '').toLowerCase())
+  if (!match) {
+    return null
+  }
+  const sequence = Number(match[1])
+  return Number.isFinite(sequence) ? sequence : null
+}
+
+const formatUserSequence = (sequence) => `${USER_CODE_PREFIX}${String(Math.max(1, sequence)).padStart(4, '0')}`
+
+const getNextUserSequence = (users) =>
+  users.reduce((maxSequence, user) => {
+    const sequence = parseUserSequence(user.userId)
+    if (!sequence) {
+      return maxSequence
+    }
+    return sequence > maxSequence ? sequence : maxSequence
+  }, 0) + 1
 
 const ROLES = [
   { id: 'admin', label: 'Admin', canAdjust: true },
@@ -43,6 +71,21 @@ const sanitizePhoneE164 = (value) => {
 }
 
 const sanitizeEmail = (value) => sanitizeText(value, 180).toLowerCase()
+const normalizeUserCode = (value) => sanitizeText(value, 40).toLowerCase()
+const normalizeFullName = (firstName, lastName) => `${firstName} ${lastName}`.replace(/\s+/g, ' ').trim()
+const sanitizePublicUrl = (value) => {
+  const candidate = String(value || '').trim()
+  if (!candidate) {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(candidate)
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : ''
+  } catch {
+    return ''
+  }
+}
 
 const sortByDateDesc = (rows, dateField) => {
   return [...rows].sort((a, b) => {
@@ -71,7 +114,7 @@ const localCheckInFallback = ({ users, qrs, payload }) => {
   return { ok: true, reason: null, awardedVisits: 1 }
 }
 
-const localRedeemFallback = ({ users, rewards, payload }) => {
+const localRedeemFallback = ({ users, rewards, redemptions, payload }) => {
   const user = getUserById(users, payload.userId)
   const reward = getRewardById(rewards, payload.rewardId)
 
@@ -81,6 +124,17 @@ const localRedeemFallback = ({ users, rewards, payload }) => {
 
   if (!reward || reward.status !== 'active') {
     return { ok: false, reason: 'REWARD_NOT_ACTIVE' }
+  }
+
+  const userRewardRedeemCount = redemptions.filter(
+    (entry) =>
+      entry.userId === payload.userId &&
+      entry.rewardId === payload.rewardId &&
+      ['approved', 'delivered'].includes(String(entry.status || '').toLowerCase()),
+  ).length
+
+  if (userRewardRedeemCount >= 1) {
+    return { ok: false, reason: 'MAX_REDEMPTIONS_PER_USER_REACHED' }
   }
 
   if (user.visitBalanceCached < reward.requiredVisits) {
@@ -115,7 +169,10 @@ const withDerivedOperationFields = ({ users, qrs, rewards, checkIns, redemptions
     ...entry,
     reason: entry.rejectReason || null,
     userName: userById[entry.userId]?.fullName || entry.userId,
-    discipline: qrById[entry.qrCodeId]?.disciplineId || 'General',
+    discipline:
+      qrById[entry.qrCodeId]?.disciplineId === 'all'
+        ? 'Todas las disciplinas'
+        : qrById[entry.qrCodeId]?.disciplineId || 'General',
   }))
 
   const enrichedRedemptions = redemptions.map((entry) => ({
@@ -140,11 +197,16 @@ export const useOperationsStore = create()((set, get) => ({
   users: [],
   qrCampaigns: [],
   rewards: [],
+  checkInsRaw: [],
   checkIns: [],
   redemptions: [],
+  notifications: [],
+  usersRealtimeUnsubscribe: null,
+  checkInsRealtimeUnsubscribe: null,
+  notificationsRealtimeUnsubscribe: null,
   isBootstrappingData: false,
   hasLoadedRemoteData: false,
-  activityFeed: [createActivity('SYSTEM', 'Store operativo inicializado.')],
+  activityFeed: [createActivity('SYSTEM', 'Panel operativo inicializado.')],
   lastTransactionResult: null,
 
   setRole: (roleId) => {
@@ -171,12 +233,13 @@ export const useOperationsStore = create()((set, get) => ({
 
     try {
       const tenantId = state.tenantId
-      const [users, qrs, rewards, checkIns, redemptions] = await Promise.all([
+      const [users, qrs, rewards, checkIns, redemptions, notifications] = await Promise.all([
         listEntityRecords({ db, tenantId, entityKey: 'user', limit: 300 }),
         listEntityRecords({ db, tenantId, entityKey: 'qrCode', limit: 300 }),
         listEntityRecords({ db, tenantId, entityKey: 'reward', limit: 300 }),
         listEntityRecords({ db, tenantId, entityKey: 'checkIn', limit: 500 }),
         listEntityRecords({ db, tenantId, entityKey: 'redemption', limit: 500 }),
+        listEntityRecords({ db, tenantId, entityKey: 'notification', limit: 400 }),
       ])
 
       const sortedUsers = sortByDateDesc(users, 'createdAtCustom')
@@ -184,6 +247,7 @@ export const useOperationsStore = create()((set, get) => ({
       const sortedRewards = sortByDateDesc(rewards, 'createdAtCustom')
       const sortedCheckIns = sortByDateDesc(checkIns, 'scannedAtCustom')
       const sortedRedemptions = sortByDateDesc(redemptions, 'requestedAtCustom')
+      const sortedNotifications = sortByDateDesc(notifications, 'createdAtCustom')
 
       const derived = withDerivedOperationFields({
         users: sortedUsers,
@@ -197,13 +261,15 @@ export const useOperationsStore = create()((set, get) => ({
         users: sortedUsers,
         qrCampaigns: derived.qrs,
         rewards: sortedRewards,
+        checkInsRaw: sortedCheckIns,
         checkIns: derived.checkIns,
         redemptions: derived.redemptions,
+        notifications: sortedNotifications,
         hasLoadedRemoteData: true,
         isBootstrappingData: false,
         activityFeed: appendActivity(
           current,
-          createActivity('DATA_SYNC', 'Datos sincronizados desde Firestore.'),
+          createActivity('DATA_SYNC', 'Datos del dashboard actualizados.'),
         ),
       }))
 
@@ -213,7 +279,7 @@ export const useOperationsStore = create()((set, get) => ({
         isBootstrappingData: false,
         activityFeed: appendActivity(
           current,
-          createActivity('DATA_SYNC_ERROR', 'No se pudo cargar Firestore.', {
+          createActivity('DATA_SYNC_ERROR', 'No fue posible cargar los datos del panel.', {
             message: error?.message,
           }),
         ),
@@ -226,6 +292,158 @@ export const useOperationsStore = create()((set, get) => ({
     }
   },
 
+  startCheckInsRealtimeSync: () => {
+    const state = get()
+    if (state.checkInsRealtimeUnsubscribe) {
+      return state.checkInsRealtimeUnsubscribe
+    }
+
+    const unsubscribe = subscribeCheckInFeed({
+      tenantId: state.tenantId,
+      limit: 700,
+      onData: (realtimeEntries) => {
+        set((current) => {
+          const checkInsMap = new Map(
+            (current.checkInsRaw || []).map((entry) => [entry.checkInId, entry]),
+          )
+
+          realtimeEntries.forEach((entry) => {
+            checkInsMap.set(entry.checkInId, {
+              ...(checkInsMap.get(entry.checkInId) || {}),
+              ...entry,
+            })
+          })
+
+          const mergedRaw = sortByDateDesc(Array.from(checkInsMap.values()), 'scannedAtCustom').slice(0, 900)
+          const derived = withDerivedOperationFields({
+            users: current.users,
+            qrs: current.qrCampaigns,
+            rewards: current.rewards,
+            checkIns: mergedRaw,
+            redemptions: current.redemptions,
+          })
+
+          return {
+            checkInsRaw: mergedRaw,
+            checkIns: derived.checkIns,
+            qrCampaigns: derived.qrs,
+          }
+        })
+      },
+      onError: () => {
+        set((current) => ({
+          activityFeed: appendActivity(
+            current,
+            createActivity(
+              'RTDB_SYNC_ERROR',
+              'No fue posible sincronizar visitas en tiempo real en este momento.',
+            ),
+          ),
+        }))
+      },
+    })
+
+    set({ checkInsRealtimeUnsubscribe: unsubscribe })
+    return unsubscribe
+  },
+
+  stopCheckInsRealtimeSync: () => {
+    const unsubscribe = get().checkInsRealtimeUnsubscribe
+    if (typeof unsubscribe === 'function') {
+      unsubscribe()
+    }
+    set({ checkInsRealtimeUnsubscribe: null })
+  },
+
+  startUsersRealtimeSync: () => {
+    const state = get()
+    if (state.usersRealtimeUnsubscribe) {
+      return state.usersRealtimeUnsubscribe
+    }
+
+    const unsubscribe = subscribeUsersFeed({
+      tenantId: state.tenantId,
+      maxItems: 700,
+      onData: (usersFeed) => {
+        set((current) => {
+          const sortedUsers = sortByDateDesc(usersFeed, 'createdAtCustom')
+          const derived = withDerivedOperationFields({
+            users: sortedUsers,
+            qrs: current.qrCampaigns,
+            rewards: current.rewards,
+            checkIns: current.checkInsRaw,
+            redemptions: current.redemptions,
+          })
+
+          return {
+            users: sortedUsers,
+            qrCampaigns: derived.qrs,
+            checkIns: derived.checkIns,
+            redemptions: derived.redemptions,
+          }
+        })
+      },
+      onError: () => {
+        set((current) => ({
+          activityFeed: appendActivity(
+            current,
+            createActivity('USERS_SYNC_ERROR', 'No fue posible sincronizar alumnos en tiempo real.'),
+          ),
+        }))
+      },
+    })
+
+    set({ usersRealtimeUnsubscribe: unsubscribe })
+    return unsubscribe
+  },
+
+  stopUsersRealtimeSync: () => {
+    const unsubscribe = get().usersRealtimeUnsubscribe
+    if (typeof unsubscribe === 'function') {
+      unsubscribe()
+    }
+    set({ usersRealtimeUnsubscribe: null })
+  },
+
+  startNotificationsRealtimeSync: () => {
+    const state = get()
+    if (state.notificationsRealtimeUnsubscribe) {
+      return state.notificationsRealtimeUnsubscribe
+    }
+
+    const unsubscribe = subscribeNotificationsFeed({
+      tenantId: state.tenantId,
+      maxItems: 400,
+      onData: (items) => {
+        set({
+          notifications: sortByDateDesc(items, 'createdAtCustom'),
+        })
+      },
+      onError: () => {
+        set((current) => ({
+          activityFeed: appendActivity(
+            current,
+            createActivity(
+              'NOTIFICATIONS_SYNC_ERROR',
+              'No fue posible sincronizar notificaciones en tiempo real.',
+            ),
+          ),
+        }))
+      },
+    })
+
+    set({ notificationsRealtimeUnsubscribe: unsubscribe })
+    return unsubscribe
+  },
+
+  stopNotificationsRealtimeSync: () => {
+    const unsubscribe = get().notificationsRealtimeUnsubscribe
+    if (typeof unsubscribe === 'function') {
+      unsubscribe()
+    }
+    set({ notificationsRealtimeUnsubscribe: null })
+  },
+
   registerUser: async (draft, actor = 'admin-ui') => {
     const tenantId = get().tenantId
     const firstName = sanitizeText(draft.firstName, 80)
@@ -233,16 +451,34 @@ export const useOperationsStore = create()((set, get) => ({
     const phoneE164 = sanitizePhoneE164(draft.phoneE164)
     const discipline = sanitizeText(draft.discipline || 'General', 60)
     const email = sanitizeEmail(draft.email)
+    const profileImageUrl = sanitizePublicUrl(draft.profileImageUrl)
+    const normalizedUserId = normalizeUserCode(draft.userId)
+    const existingUserIds = new Set(get().users.map((user) => String(user.userId || '').toLowerCase()))
+    let sequenceCursor = getNextUserSequence(get().users)
+    let resolvedUserId = USER_CODE_REGEX.test(normalizedUserId)
+      ? normalizedUserId
+      : formatUserSequence(sequenceCursor)
+    while (existingUserIds.has(resolvedUserId)) {
+      sequenceCursor += 1
+      resolvedUserId = formatUserSequence(sequenceCursor)
+    }
 
-    if (!firstName || !lastName || !phoneE164 || !discipline) {
-      return { ok: false, message: 'Completa nombre, apellidos, teléfono y disciplina.' }
+    if (!firstName || !lastName || !phoneE164 || !discipline || !email) {
+      return {
+        ok: false,
+        message: 'Completa nombre, apellidos, teléfono, disciplina y correo electrónico.',
+      }
+    }
+
+    if (!USER_CODE_REGEX.test(resolvedUserId)) {
+      return { ok: false, message: 'El número de usuario no cumple formato ywstudio-0001.' }
     }
 
     if (!/^\+[1-9]\d{7,14}$/.test(phoneE164)) {
       return { ok: false, message: 'El teléfono debe estar en formato E.164.' }
     }
 
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return { ok: false, message: 'El correo electrónico no es válido.' }
     }
 
@@ -257,12 +493,13 @@ export const useOperationsStore = create()((set, get) => ({
         entityKey: 'user',
         actorId: actor,
         payload: {
-          userId: draft.userId || createId('USR'),
+          userId: resolvedUserId,
           firstName,
           lastName,
           phoneE164,
           disciplineIds: [discipline],
-          ...(email ? { email } : {}),
+          email,
+          ...(profileImageUrl ? { profileImageUrl } : {}),
           ...(draft.birthDate ? { birthDate: draft.birthDate } : {}),
           status: 'active',
           visitBalanceCached: 0,
@@ -319,6 +556,101 @@ export const useOperationsStore = create()((set, get) => ({
       return {
         ok: false,
         message: error?.message || 'No se pudo actualizar el estado del usuario.',
+      }
+    }
+  },
+
+  updateUserProfile: async (userId, draft, actor = 'admin-ui') => {
+    const firstName = sanitizeText(draft.firstName, 80)
+    const lastName = sanitizeText(draft.lastName, 80)
+    const phoneE164 = sanitizePhoneE164(draft.phoneE164)
+    const discipline = sanitizeText(draft.discipline || 'General', 60)
+    const email = sanitizeEmail(draft.email)
+    const birthDate = draft.birthDate ? String(draft.birthDate).trim() : ''
+    const hasProfileImageField = Object.prototype.hasOwnProperty.call(draft, 'profileImageUrl')
+    const profileImageUrl = sanitizePublicUrl(draft.profileImageUrl)
+
+    if (!firstName || !lastName || !phoneE164 || !discipline || !email) {
+      return {
+        ok: false,
+        message: 'Completa nombre, apellidos, teléfono, disciplina y correo electrónico.',
+      }
+    }
+
+    if (!/^\+[1-9]\d{7,14}$/.test(phoneE164)) {
+      return { ok: false, message: 'El teléfono debe estar en formato E.164.' }
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, message: 'El correo electrónico no es válido.' }
+    }
+
+    if (birthDate && !dayjs(birthDate, 'YYYY-MM-DD', true).isValid()) {
+      return { ok: false, message: 'La fecha de nacimiento no es válida.' }
+    }
+
+    try {
+      const result = await upsertEntityRecord({
+        db,
+        tenantId: get().tenantId,
+        entityKey: 'user',
+        entityId: userId,
+        actorId: actor,
+        payload: {
+          firstName,
+          lastName,
+          fullName: normalizeFullName(firstName, lastName),
+          phoneE164,
+          disciplineIds: [discipline],
+          email,
+          birthDate: birthDate || null,
+          ...(hasProfileImageField ? { profileImageUrl: profileImageUrl || '' } : {}),
+          updatedAtCustom: nowCustom(),
+        },
+      })
+
+      set((state) => ({
+        users: state.users.map((user) =>
+          user.userId === userId ? { ...user, ...result.record } : user,
+        ),
+        activityFeed: appendActivity(
+          state,
+          createActivity('USER_UPDATED', `Perfil de usuario ${userId} actualizado.`),
+        ),
+      }))
+
+      return { ok: true, record: result.record }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error?.message || 'No se pudo actualizar el usuario.',
+      }
+    }
+  },
+
+  deleteUser: async (userId, actor = 'admin-ui') => {
+    try {
+      await deleteEntityRecord({
+        db,
+        tenantId: get().tenantId,
+        entityKey: 'user',
+        entityId: userId,
+      })
+
+      set((state) => ({
+        users: state.users.filter((user) => user.userId !== userId),
+        activityFeed: appendActivity(
+          state,
+          createActivity('USER_DELETED', `Usuario ${userId} eliminado por ${actor}.`),
+        ),
+      }))
+
+      await get().bootstrapData({ force: true })
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error?.message || 'No se pudo eliminar el usuario.',
       }
     }
   },
@@ -418,6 +750,33 @@ export const useOperationsStore = create()((set, get) => ({
     }
   },
 
+  deleteQrCampaign: async (qrCodeId, actor = 'admin-ui') => {
+    try {
+      await deleteEntityRecord({
+        db,
+        tenantId: get().tenantId,
+        entityKey: 'qrCode',
+        entityId: qrCodeId,
+      })
+
+      set((state) => ({
+        qrCampaigns: state.qrCampaigns.filter((qr) => qr.qrCodeId !== qrCodeId),
+        activityFeed: appendActivity(
+          state,
+          createActivity('QR_DELETED', `Campaña QR ${qrCodeId} eliminada por ${actor}.`),
+        ),
+      }))
+
+      await get().bootstrapData({ force: true })
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error?.message || 'No se pudo eliminar la campaña QR.',
+      }
+    }
+  },
+
   upsertReward: async (draft, actor = 'admin-ui') => {
     const rewardId = draft.rewardId || createId('reward')
     const name = sanitizeText(draft.name, 120)
@@ -438,10 +797,11 @@ export const useOperationsStore = create()((set, get) => ({
       rewardId,
       name,
       description: sanitizeText(draft.description || '', 240),
+      rewardImageUrl: sanitizePublicUrl(draft.rewardImageUrl || ''),
       requiredVisits: Number(draft.requiredVisits || 8),
       stockType: sanitizeText(draft.stockType || 'finite', 30),
       stockAvailable: Number(draft.stockAvailable || 0),
-      maxPerUser: Number(draft.maxPerUser || 1),
+      maxPerUser: 1,
       status: draft.status === 'retired' ? 'archived' : sanitizeText(draft.status || 'active', 30),
       validFromCustom: draft.validFromCustom,
       validUntilCustom: draft.validUntilCustom,
@@ -608,7 +968,7 @@ export const useOperationsStore = create()((set, get) => ({
           result.ok ? 'CHECKIN_OK' : 'CHECKIN_REJECTED',
           result.ok
             ? `Check-in aprobado para ${payload.userId}.`
-            : `Check-in bloqueado (${result.reason || 'UNKNOWN'}).`,
+            : `Check-in bloqueado: ${getFriendlyReason(result.reason)}.`,
         ),
       ),
     }))
@@ -633,6 +993,7 @@ export const useOperationsStore = create()((set, get) => ({
       const fallback = localRedeemFallback({
         users: stateBefore.users,
         rewards: stateBefore.rewards,
+        redemptions: stateBefore.redemptions,
         payload,
       })
 
@@ -710,7 +1071,7 @@ export const useOperationsStore = create()((set, get) => ({
           result.ok ? 'REDEEM_OK' : 'REDEEM_REJECTED',
           result.ok
             ? `Canje aprobado para ${payload.userId}.`
-            : `Canje rechazado (${result.reason || 'UNKNOWN'}).`,
+            : `Canje rechazado: ${getFriendlyReason(result.reason)}.`,
         ),
       ),
     }))
@@ -720,6 +1081,21 @@ export const useOperationsStore = create()((set, get) => ({
 
   resolveRedemptionStatus: async (redemptionId, status, actor = 'admin-ui') => {
     const normalizedStatus = sanitizeText(status, 30)
+    const currentRedemption = get().redemptions.find((entry) => entry.redemptionId === redemptionId)
+
+    if (!currentRedemption) {
+      return {
+        ok: false,
+        message: 'No se encontró el canje seleccionado.',
+      }
+    }
+
+    if (normalizedStatus === 'delivered' && currentRedemption.status !== 'approved') {
+      return {
+        ok: false,
+        message: 'Solo los canjes aprobados pueden marcarse como entregados.',
+      }
+    }
 
     try {
       const now = nowCustom()
@@ -751,6 +1127,63 @@ export const useOperationsStore = create()((set, get) => ({
       return {
         ok: false,
         message: error?.message || 'No se pudo actualizar el estado del canje.',
+      }
+    }
+  },
+
+  markNotificationAsRead: async (notificationId, actor = 'admin-ui') => {
+    const notification = get().notifications.find((entry) => entry.notificationId === notificationId)
+    if (!notification || notification.isRead) {
+      return { ok: true }
+    }
+
+    try {
+      const now = nowCustom()
+      const result = await upsertEntityRecord({
+        db,
+        tenantId: get().tenantId,
+        entityKey: 'notification',
+        entityId: notificationId,
+        actorId: actor,
+        payload: {
+          isRead: true,
+          readAtCustom: now,
+          updatedAtCustom: now,
+        },
+      })
+
+      set((state) => ({
+        notifications: state.notifications.map((entry) =>
+          entry.notificationId === notificationId ? { ...entry, ...result.record } : entry,
+        ),
+      }))
+
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error?.message || 'No se pudo actualizar la notificación.',
+      }
+    }
+  },
+
+  markAllNotificationsAsRead: async (actor = 'admin-ui') => {
+    const unread = get().notifications.filter((entry) => !entry.isRead)
+    if (!unread.length) {
+      return { ok: true }
+    }
+
+    try {
+      await Promise.all(
+        unread.map((entry) =>
+          get().markNotificationAsRead(entry.notificationId, actor),
+        ),
+      )
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error?.message || 'No se pudieron actualizar las notificaciones.',
       }
     }
   },

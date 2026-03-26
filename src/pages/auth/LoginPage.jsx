@@ -61,29 +61,29 @@ function LoginPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-warm">
-      <div className="pointer-events-none absolute -top-24 left-[-120px] h-96 w-96 rounded-full bg-primary/70 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-140px] right-[-100px] h-96 w-96 rounded-full bg-secondary/25 blur-3xl" />
+      <div className="pointer-events-none absolute -top-24 left-[-120px] h-96 w-96 rounded-full bg-primary/80 blur-[80px] transition-all duration-1000" />
+      <div className="pointer-events-none absolute bottom-[-140px] right-[-100px] h-96 w-96 rounded-full bg-secondary/30 blur-[80px] transition-all duration-1000" />
 
       <section className="relative mx-auto flex min-h-screen w-full max-w-6xl items-center px-5 py-10 sm:px-8">
         <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_460px]">
-          <article className="hidden rounded-3xl border border-secondary/15 bg-white/50 p-8 backdrop-blur lg:block">
+          <article className="hidden rounded-3xl border border-secondary/15 bg-white/50 p-8 backdrop-blur-xl shadow-2xl shadow-secondary/5 lg:block">
             <p className="inline-flex items-center gap-2 rounded-full border border-secondary/25 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink/70">
               <img src={logo} alt="YW Studio" className="h-[18px] w-[18px] rounded-full object-cover shadow-sm" />
               ywstudio loyalty
             </p>
             <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-ink">
-              Controla asistencia, premios y canjes en un solo dashboard.
+              Administra el programa de lealtad.
             </h1>
             <p className="mt-4 max-w-xl text-sm text-ink/75">
               Inicia sesión para gestionar el programa de lealtad con trazabilidad, reglas de negocio y operación diaria.
             </p>
           </article>
 
-          <article className="rounded-3xl border border-secondary/20 bg-white/95 p-6 shadow-soft sm:p-8">
+          <article className="rounded-3xl border border-secondary/20 bg-white/95 p-6 shadow-xl shadow-secondary/10 sm:p-8 transition-shadow hover:shadow-2xl hover:shadow-secondary/15 duration-500">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary">Acceso seguro</p>
               <h2 className="mt-2 font-display text-3xl font-semibold text-ink">Iniciar sesión</h2>
-              <p className="mt-2 text-sm text-ink/70">Accede con tu cuenta de Firebase Authentication.</p>
+              <p className="mt-2 text-sm text-ink/70">Accede con tu cuenta de administrador.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -91,7 +91,7 @@ function LoginPage() {
                 <label htmlFor="loginEmail" className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
                   Correo electrónico *
                 </label>
-                <div className="flex items-center gap-2 rounded-xl border border-secondary/25 bg-white px-3 py-2">
+                <div className="group flex items-center gap-2 rounded-xl border border-secondary/25 bg-white px-3 py-2 shadow-sm transition-all duration-300 hover:border-secondary/50 focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20">
                   <Mail size={16} className="text-secondary/90" />
                   <input
                     id="loginEmail"
@@ -115,7 +115,7 @@ function LoginPage() {
                 >
                   Contraseña *
                 </label>
-                <div className="flex items-center gap-2 rounded-xl border border-secondary/25 bg-white px-3 py-2">
+                <div className="group flex items-center gap-2 rounded-xl border border-secondary/25 bg-white px-3 py-2 shadow-sm transition-all duration-300 hover:border-secondary/50 focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20">
                   <LockKeyhole size={16} className="text-secondary/90" />
                   <input
                     id="loginPassword"
@@ -135,9 +135,9 @@ function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoggingIn}
-                className="w-full rounded-xl bg-secondary px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-xl bg-secondary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:ring-offset-1 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoggingIn ? 'Validando credenciales...' : 'Entrar al dashboard'}
+                {isLoggingIn ? 'Validando credenciales...' : 'Iniciar sesión'}
               </button>
             </form>
           </article>

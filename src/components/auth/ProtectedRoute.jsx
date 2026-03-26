@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import FullScreenLoader from '../ui/FullScreenLoader'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -6,8 +7,16 @@ function ProtectedRoute() {
   const user = useAuthStore((state) => state.user)
   const isCheckingSession = useAuthStore((state) => state.isCheckingSession)
   const location = useLocation()
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false)
 
-  if (isCheckingSession) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isCheckingSession || !minTimeElapsed) {
     return <FullScreenLoader />
   }
 

@@ -23,12 +23,12 @@ export const navigationItems = [
     icon: ClipboardList,
   },
   {
-    label: 'Premios y reglas',
+    label: 'Premios y canjes',
     path: '/premios',
     icon: Gift,
   },
   {
-    label: 'Canjes y reportes',
+    label: 'Historial',
     path: '/canjes',
     icon: History,
   },

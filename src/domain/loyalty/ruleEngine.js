@@ -144,7 +144,7 @@ export const evaluateRewardRedemption = ({
     return { valid: false, reason: REJECTION_REASON.OUT_OF_STOCK }
   }
 
-  if (reward.maxPerUser && userRedemptionCount >= reward.maxPerUser) {
+  if (userRedemptionCount >= 1) {
     return {
       valid: false,
       reason: REJECTION_REASON.MAX_REDEMPTIONS_PER_USER_REACHED,
@@ -182,4 +182,3 @@ export const getRulebookHealth = ({ rules, rewards }) => {
     issues,
   }
 }
-
