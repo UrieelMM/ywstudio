@@ -11,8 +11,8 @@ export default {
         surface: '#f5eeea',
       },
       fontFamily: {
-        sans: ['Roboto', 'Avenir Next', 'Segoe UI', 'sans-serif'],
-        display: ['Alkatra', 'cursive'],
+        sans: ['Roboto', 'sans-serif'],
+        display: ['Roboto', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 16px 40px -24px rgba(56, 34, 20, 0.35)',
