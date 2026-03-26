@@ -555,7 +555,7 @@ function DashboardOverviewPage() {
       <PageHeader
         eyebrow="Resumen"
         title="Dashboard general"
-        description="Visión ejecutiva del programa de lealtad: alumnos, campañas QR, canjes e inventario de premios."
+        description="Visión general del programa de lealtad: alumnos, campañas QR, canjes e inventario de premios."
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
