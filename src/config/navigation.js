@@ -2,11 +2,18 @@ import {
   ClipboardList,
   Gift,
   History,
+  LayoutDashboard,
   QrCode,
+  Settings,
   Users,
 } from 'lucide-react'
 
 export const navigationItems = [
+  {
+    label: 'Dashboard general',
+    path: '/dashboard',
+    icon: LayoutDashboard,
+  },
   {
     label: 'Registro de usuarios',
     path: '/usuarios',
@@ -32,9 +39,19 @@ export const navigationItems = [
     path: '/canjes',
     icon: History,
   },
+  {
+    label: 'Configuración',
+    path: '/configuracion',
+    icon: Settings,
+    placement: 'bottom',
+  },
 ]
 
 export const pageMetaByPath = {
+  '/dashboard': {
+    title: 'Dashboard general',
+    description: 'Resumen global de asistencias, canjes y desempeño por disciplina.',
+  },
   '/usuarios': {
     title: 'Registro de usuarios',
     description: 'Alta, segmentación y estado de alumnos del programa.',
@@ -54,5 +71,9 @@ export const pageMetaByPath = {
   '/canjes': {
     title: 'Historial y reportes de canjes',
     description: 'Seguimiento de entregas y rendimiento del plan.',
+  },
+  '/configuracion': {
+    title: 'Configuración',
+    description: 'Administra branding, sedes y disciplinas del sistema.',
   },
 }

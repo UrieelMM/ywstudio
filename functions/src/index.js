@@ -84,11 +84,10 @@ const DEFAULT_RULEBOOK = {
   visitsPerCheckIn: 1,
   checkInCooldownMinutes: 90,
   maxScansPerUserPerDay: 2,
-  allowSameDayRedeem: false,
+  allowSameDayRedeem: true,
 }
 
 const dayKeyFromDate = (dateObj) => dateObj.format('YYYY-MM-DD')
-const isSameDay = (a, b) => dayjs(a).format('YYYY-MM-DD') === dayjs(b).format('YYYY-MM-DD')
 
 const sanitizeIdempotencyKey = (value) =>
   String(value || '')
@@ -377,7 +376,6 @@ const evaluateCheckInRejection = ({ user, qr, rules, now, dailyUsage }) => {
 const evaluateRedemptionRejection = ({
   user,
   reward,
-  rules,
   now,
   userRewardCounter,
 }) => {
@@ -402,10 +400,6 @@ const evaluateRedemptionRejection = ({
   const redeemedCount = Number(userRewardCounter?.redeemCount || 0)
   if (redeemedCount >= 1) {
     return REJECTION_REASON.MAX_REDEMPTIONS_PER_USER_REACHED
-  }
-
-  if (!rules.allowSameDayRedeem && user.lastCheckInAtCustom && isSameDay(user.lastCheckInAtCustom, now)) {
-    return REJECTION_REASON.SAME_DAY_REDEEM_NOT_ALLOWED
   }
 
   const balance = Number(user.visitBalanceCached || 0)

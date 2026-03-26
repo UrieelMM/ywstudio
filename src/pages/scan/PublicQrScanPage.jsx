@@ -4,11 +4,12 @@ import { CheckCircle2, QrCode, TriangleAlert, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { doc, getDoc } from 'firebase/firestore'
 import { useParams } from 'react-router-dom'
-import logo from '../../assets/ywstudio_logo.jpg'
+import defaultLogo from '../../assets/ywstudio_logo.jpg'
 import Spinner from '../../components/ui/Spinner'
 import { db } from '../../lib/firebase'
 import { getFriendlyReason } from '../../lib/loyaltyMessages'
 import { runPublicQrCheckIn } from '../../services/loyaltyTransactionsService'
+import { useOperationsStore } from '../../store/useOperationsStore'
 
 const TENANT_ID = 'tenant-ywstudio'
 
@@ -34,6 +35,8 @@ const sanitizeEmail = (value) => String(value || '').trim().toLowerCase()
 
 function PublicQrScanPage() {
   const { qrCodeId = '' } = useParams()
+  const appConfig = useOperationsStore((state) => state.appConfig)
+  const logo = appConfig.logoUrl || defaultLogo
   const [isLoadingQr, setIsLoadingQr] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [scanResult, setScanResult] = useState(null)

@@ -4,6 +4,7 @@ import {
   createEntityRecord,
   deleteEntityRecord,
   listEntityRecords,
+  readEntityRecord,
   upsertEntityRecord,
 } from '../services/loyaltyDataContractRepository'
 import { subscribeCheckInFeed } from '../services/checkInRealtimeService'
@@ -20,6 +21,9 @@ const createId = (prefix) =>
 
 const USER_CODE_PREFIX = 'ywstudio-'
 const USER_CODE_REGEX = /^ywstudio-(\d{4,})$/
+const APP_CONFIG_DOC_ID = 'app'
+const DEFAULT_BRANCHES = ['Tizayuca']
+const DEFAULT_DISCIPLINES = ['Ballet', 'Jazz', 'Hip Hop', 'Contemporáneo', 'Baile Fitness']
 
 const parseUserSequence = (userId) => {
   const match = USER_CODE_REGEX.exec(String(userId || '').toLowerCase())
@@ -84,6 +88,42 @@ const sanitizePublicUrl = (value) => {
     return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : ''
   } catch {
     return ''
+  }
+}
+
+const sanitizeSettingsList = (value, maxLength = 80) => {
+  const sanitizeCatalogValue = (entry) =>
+    String(entry || '')
+      .replace(/[<>"'`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, maxLength)
+
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '')
+        .split('\n')
+        .map((entry) => entry.trim())
+
+  const cleaned = source
+    .map((entry) => sanitizeCatalogValue(entry))
+    .filter(Boolean)
+
+  return Array.from(new Set(cleaned))
+}
+
+const normalizeAppConfig = (raw) => {
+  const adminName = sanitizeText(raw?.adminName || '', 120) || 'Administración YW Studio'
+  const logoUrl = sanitizePublicUrl(raw?.logoUrl || '')
+  const branches = sanitizeSettingsList(raw?.branches)
+  const disciplines = sanitizeSettingsList(raw?.disciplines)
+
+  return {
+    configId: APP_CONFIG_DOC_ID,
+    adminName,
+    logoUrl,
+    branches: branches.length ? branches : DEFAULT_BRANCHES,
+    disciplines: disciplines.length ? disciplines : DEFAULT_DISCIPLINES,
   }
 }
 
@@ -201,11 +241,15 @@ export const useOperationsStore = create()((set, get) => ({
   checkIns: [],
   redemptions: [],
   notifications: [],
+  appConfig: normalizeAppConfig(null),
+  hasAppConfigRecord: false,
   usersRealtimeUnsubscribe: null,
   checkInsRealtimeUnsubscribe: null,
   notificationsRealtimeUnsubscribe: null,
   isBootstrappingData: false,
+  isBootstrappingBranding: false,
   hasLoadedRemoteData: false,
+  hasLoadedPublicBranding: false,
   activityFeed: [createActivity('SYSTEM', 'Panel operativo inicializado.')],
   lastTransactionResult: null,
 
@@ -233,13 +277,19 @@ export const useOperationsStore = create()((set, get) => ({
 
     try {
       const tenantId = state.tenantId
-      const [users, qrs, rewards, checkIns, redemptions, notifications] = await Promise.all([
+      const [users, qrs, rewards, checkIns, redemptions, notifications, appConfigRecord] = await Promise.all([
         listEntityRecords({ db, tenantId, entityKey: 'user', limit: 300 }),
         listEntityRecords({ db, tenantId, entityKey: 'qrCode', limit: 300 }),
         listEntityRecords({ db, tenantId, entityKey: 'reward', limit: 300 }),
         listEntityRecords({ db, tenantId, entityKey: 'checkIn', limit: 500 }),
         listEntityRecords({ db, tenantId, entityKey: 'redemption', limit: 500 }),
         listEntityRecords({ db, tenantId, entityKey: 'notification', limit: 400 }),
+        readEntityRecord({
+          db,
+          tenantId,
+          entityKey: 'appConfig',
+          entityId: APP_CONFIG_DOC_ID,
+        }),
       ])
 
       const sortedUsers = sortByDateDesc(users, 'createdAtCustom')
@@ -248,6 +298,7 @@ export const useOperationsStore = create()((set, get) => ({
       const sortedCheckIns = sortByDateDesc(checkIns, 'scannedAtCustom')
       const sortedRedemptions = sortByDateDesc(redemptions, 'requestedAtCustom')
       const sortedNotifications = sortByDateDesc(notifications, 'createdAtCustom')
+      const normalizedAppConfig = normalizeAppConfig(appConfigRecord)
 
       const derived = withDerivedOperationFields({
         users: sortedUsers,
@@ -265,7 +316,10 @@ export const useOperationsStore = create()((set, get) => ({
         checkIns: derived.checkIns,
         redemptions: derived.redemptions,
         notifications: sortedNotifications,
+        appConfig: normalizedAppConfig,
+        hasAppConfigRecord: Boolean(appConfigRecord),
         hasLoadedRemoteData: true,
+        hasLoadedPublicBranding: true,
         isBootstrappingData: false,
         activityFeed: appendActivity(
           current,
@@ -288,6 +342,45 @@ export const useOperationsStore = create()((set, get) => ({
       return {
         ok: false,
         message: 'No fue posible cargar la información de Firebase.',
+      }
+    }
+  },
+
+  bootstrapPublicBranding: async ({ force = false } = {}) => {
+    const state = get()
+    if (state.isBootstrappingBranding) {
+      return { ok: true }
+    }
+
+    if (state.hasLoadedPublicBranding && !force) {
+      return { ok: true }
+    }
+
+    set({ isBootstrappingBranding: true })
+
+    try {
+      const appConfigRecord = await readEntityRecord({
+        db,
+        tenantId: state.tenantId,
+        entityKey: 'appConfig',
+        entityId: APP_CONFIG_DOC_ID,
+      })
+
+      set({
+        appConfig: normalizeAppConfig(appConfigRecord),
+        hasAppConfigRecord: Boolean(appConfigRecord),
+        hasLoadedPublicBranding: true,
+        isBootstrappingBranding: false,
+      })
+
+      return { ok: true }
+    } catch {
+      set({
+        isBootstrappingBranding: false,
+      })
+      return {
+        ok: false,
+        message: 'No fue posible cargar la configuración visual.',
       }
     }
   },
@@ -444,12 +537,85 @@ export const useOperationsStore = create()((set, get) => ({
     set({ notificationsRealtimeUnsubscribe: null })
   },
 
+  saveAppConfig: async (draft, actor = 'admin-ui') => {
+    const tenantId = get().tenantId
+    const adminName = sanitizeText(draft.adminName, 120)
+    const logoUrl = sanitizePublicUrl(draft.logoUrl || '')
+    const branches = sanitizeSettingsList(draft.branches)
+    const disciplines = sanitizeSettingsList(draft.disciplines)
+
+    if (!adminName) {
+      return { ok: false, message: 'Ingresa el nombre del administrador.' }
+    }
+
+    if (!branches.length) {
+      return { ok: false, message: 'Configura al menos una sede.' }
+    }
+
+    if (!disciplines.length) {
+      return { ok: false, message: 'Configura al menos una disciplina.' }
+    }
+
+    const payload = {
+      configId: APP_CONFIG_DOC_ID,
+      adminName,
+      logoUrl,
+      branches,
+      disciplines,
+    }
+
+    try {
+      const result = get().hasAppConfigRecord
+        ? await upsertEntityRecord({
+            db,
+            tenantId,
+            entityKey: 'appConfig',
+            entityId: APP_CONFIG_DOC_ID,
+            actorId: actor,
+            payload: {
+              ...payload,
+              updatedAtCustom: nowCustom(),
+            },
+          })
+        : await createEntityRecord({
+            db,
+            tenantId,
+            entityKey: 'appConfig',
+            actorId: actor,
+            payload,
+          })
+
+      const normalized = normalizeAppConfig(result.record)
+      set((state) => ({
+        appConfig: normalized,
+        hasAppConfigRecord: true,
+        hasLoadedPublicBranding: true,
+        activityFeed: appendActivity(
+          state,
+          createActivity('CONFIG_UPDATED', 'Configuración general actualizada.'),
+        ),
+      }))
+
+      return { ok: true, record: normalized }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error?.message || 'No fue posible guardar la configuración.',
+      }
+    }
+  },
+
   registerUser: async (draft, actor = 'admin-ui') => {
     const tenantId = get().tenantId
+    const fallbackDiscipline = get().appConfig.disciplines?.[0] || 'General'
     const firstName = sanitizeText(draft.firstName, 80)
     const lastName = sanitizeText(draft.lastName, 80)
     const phoneE164 = sanitizePhoneE164(draft.phoneE164)
-    const discipline = sanitizeText(draft.discipline || 'General', 60)
+    const disciplineIds = (
+      Array.isArray(draft.disciplineIds) ? draft.disciplineIds : [draft.discipline || fallbackDiscipline]
+    )
+      .map((entry) => sanitizeText(entry, 60))
+      .filter(Boolean)
     const email = sanitizeEmail(draft.email)
     const profileImageUrl = sanitizePublicUrl(draft.profileImageUrl)
     const normalizedUserId = normalizeUserCode(draft.userId)
@@ -463,10 +629,10 @@ export const useOperationsStore = create()((set, get) => ({
       resolvedUserId = formatUserSequence(sequenceCursor)
     }
 
-    if (!firstName || !lastName || !phoneE164 || !discipline || !email) {
+    if (!firstName || !lastName || !phoneE164 || !disciplineIds.length || !email) {
       return {
         ok: false,
-        message: 'Completa nombre, apellidos, teléfono, disciplina y correo electrónico.',
+        message: 'Completa nombre, apellidos, teléfono, al menos una disciplina y correo electrónico.',
       }
     }
 
@@ -497,7 +663,7 @@ export const useOperationsStore = create()((set, get) => ({
           firstName,
           lastName,
           phoneE164,
-          disciplineIds: [discipline],
+          disciplineIds: Array.from(new Set(disciplineIds)),
           email,
           ...(profileImageUrl ? { profileImageUrl } : {}),
           ...(draft.birthDate ? { birthDate: draft.birthDate } : {}),
@@ -561,19 +727,24 @@ export const useOperationsStore = create()((set, get) => ({
   },
 
   updateUserProfile: async (userId, draft, actor = 'admin-ui') => {
+    const fallbackDiscipline = get().appConfig.disciplines?.[0] || 'General'
     const firstName = sanitizeText(draft.firstName, 80)
     const lastName = sanitizeText(draft.lastName, 80)
     const phoneE164 = sanitizePhoneE164(draft.phoneE164)
-    const discipline = sanitizeText(draft.discipline || 'General', 60)
+    const disciplineIds = (
+      Array.isArray(draft.disciplineIds) ? draft.disciplineIds : [draft.discipline || fallbackDiscipline]
+    )
+      .map((entry) => sanitizeText(entry, 60))
+      .filter(Boolean)
     const email = sanitizeEmail(draft.email)
     const birthDate = draft.birthDate ? String(draft.birthDate).trim() : ''
     const hasProfileImageField = Object.prototype.hasOwnProperty.call(draft, 'profileImageUrl')
     const profileImageUrl = sanitizePublicUrl(draft.profileImageUrl)
 
-    if (!firstName || !lastName || !phoneE164 || !discipline || !email) {
+    if (!firstName || !lastName || !phoneE164 || !disciplineIds.length || !email) {
       return {
         ok: false,
-        message: 'Completa nombre, apellidos, teléfono, disciplina y correo electrónico.',
+        message: 'Completa nombre, apellidos, teléfono, al menos una disciplina y correo electrónico.',
       }
     }
 
@@ -601,7 +772,7 @@ export const useOperationsStore = create()((set, get) => ({
           lastName,
           fullName: normalizeFullName(firstName, lastName),
           phoneE164,
-          disciplineIds: [discipline],
+          disciplineIds: Array.from(new Set(disciplineIds)),
           email,
           birthDate: birthDate || null,
           ...(hasProfileImageField ? { profileImageUrl: profileImageUrl || '' } : {}),
@@ -657,9 +828,11 @@ export const useOperationsStore = create()((set, get) => ({
 
   createQrCampaign: async (draft, actor = 'admin-ui') => {
     const tenantId = get().tenantId
+    const fallbackBranch = get().appConfig.branches?.[0] || ''
+    const fallbackDiscipline = get().appConfig.disciplines?.[0] || 'General'
     const name = sanitizeText(draft.name, 120)
-    const branchId = sanitizeText(draft.branchId, 60)
-    const disciplineId = sanitizeText(draft.disciplineId, 60)
+    const branchId = sanitizeText(draft.branchId || fallbackBranch, 60)
+    const disciplineId = sanitizeText(draft.disciplineId || fallbackDiscipline, 60)
 
     if (!name || !branchId || !disciplineId) {
       return { ok: false, message: 'Nombre, sede y disciplina son obligatorios.' }
@@ -780,6 +953,12 @@ export const useOperationsStore = create()((set, get) => ({
   upsertReward: async (draft, actor = 'admin-ui') => {
     const rewardId = draft.rewardId || createId('reward')
     const name = sanitizeText(draft.name, 120)
+    const configuredDisciplines = get().appConfig.disciplines || []
+    const draftDisciplineId = sanitizeText(draft.disciplineId || 'all', 60)
+    const disciplineId =
+      draftDisciplineId === 'all' || configuredDisciplines.includes(draftDisciplineId)
+        ? draftDisciplineId
+        : 'all'
 
     if (!name) {
       return { ok: false, message: 'El nombre del premio es obligatorio.' }
@@ -798,6 +977,7 @@ export const useOperationsStore = create()((set, get) => ({
       name,
       description: sanitizeText(draft.description || '', 240),
       rewardImageUrl: sanitizePublicUrl(draft.rewardImageUrl || ''),
+      disciplineId,
       requiredVisits: Number(draft.requiredVisits || 8),
       stockType: sanitizeText(draft.stockType || 'finite', 30),
       stockAvailable: Number(draft.stockAvailable || 0),

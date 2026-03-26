@@ -26,7 +26,7 @@ function AppLayout() {
   const [isPreparingData, setIsPreparingData] = useState(true)
 
   const currentMeta = useMemo(() => {
-    return pageMetaByPath[location.pathname] || pageMetaByPath['/usuarios']
+    return pageMetaByPath[location.pathname] || pageMetaByPath['/dashboard']
   }, [location.pathname])
 
   useEffect(() => {

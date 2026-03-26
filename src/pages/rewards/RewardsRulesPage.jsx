@@ -15,6 +15,7 @@ import { useOperationsStore } from '../../store/useOperationsStore'
 
 const rewardColumns = [
   { key: 'name', label: 'Premio' },
+  { key: 'disciplineId', label: 'Disciplina' },
   { key: 'requiredVisits', label: 'Visitas requeridas' },
   { key: 'stockAvailable', label: 'Stock' },
   { key: 'status', label: 'Estado' },
@@ -46,6 +47,7 @@ const createDefaultRewardDraft = () => ({
   stockType: 'finite',
   status: 'active',
   rewardImageUrl: '',
+  disciplineId: 'all',
   validFromLocal: toDateTimeLocal('2026-01-01T00:00:00.000-06:00'),
   validUntilLocal: toDateTimeLocal('2026-12-31T23:59:59.000-06:00'),
 })
@@ -63,6 +65,8 @@ function RewardsRulesPage() {
   const rewards = useOperationsStore((state) => state.rewards)
   const redemptions = useOperationsStore((state) => state.redemptions)
   const tenantId = useOperationsStore((state) => state.tenantId)
+  const appConfig = useOperationsStore((state) => state.appConfig)
+  const disciplineOptions = useMemo(() => appConfig.disciplines || [], [appConfig.disciplines])
   const upsertReward = useOperationsStore((state) => state.upsertReward)
   const updateRewardStatus = useOperationsStore((state) => state.updateRewardStatus)
   const redeemRewardOperation = useOperationsStore((state) => state.redeemRewardOperation)
@@ -128,6 +132,7 @@ function RewardsRulesPage() {
       stockType: reward.stockType || 'finite',
       status: reward.status || 'active',
       rewardImageUrl: reward.rewardImageUrl || '',
+      disciplineId: reward.disciplineId || 'all',
       validFromLocal: toDateTimeLocal(reward.validFromCustom),
       validUntilLocal: toDateTimeLocal(reward.validUntilCustom),
     })
@@ -334,6 +339,10 @@ function RewardsRulesPage() {
                 return `${row.requiredVisits} visitas`
               }
 
+              if (column === 'disciplineId') {
+                return row.disciplineId === 'all' ? 'Todas las disciplinas' : row.disciplineId
+              }
+
               if (column === 'status') {
                 return <StatusBadge value={row.status === 'active' ? 'Activo' : 'Pausado'} />
               }
@@ -503,6 +512,31 @@ function RewardsRulesPage() {
           </div>
 
           <div className="space-y-1">
+            <label htmlFor="rewardDiscipline" className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
+              Disciplina del premio *
+            </label>
+            <select
+              id="rewardDiscipline"
+              value={rewardDraft.disciplineId}
+              onChange={(event) =>
+                setRewardDraft((previous) => ({
+                  ...previous,
+                  disciplineId: event.target.value,
+                }))
+              }
+              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
+              required
+            >
+              <option value="all">Todas las disciplinas</option>
+              {disciplineOptions.map((discipline) => (
+                <option key={discipline} value={discipline}>
+                  {discipline}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
             <label
               htmlFor="requiredVisits"
               className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65"
@@ -542,8 +576,8 @@ function RewardsRulesPage() {
               className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
               required
             >
-              <option value="finite">Finite</option>
-              <option value="infinite">Infinite</option>
+              <option value="finite">Finito</option>
+              <option value="infinite">Infinito</option>
             </select>
           </div>
 
@@ -769,6 +803,14 @@ function RewardsRulesPage() {
                   <div className="flex items-center justify-between gap-2">
                     <dt className="text-ink/60">Visitas necesarias</dt>
                     <dd className="font-semibold text-ink">{selectedRewardDetail.requiredVisits}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-ink/60">Disciplina</dt>
+                    <dd className="font-semibold text-ink">
+                      {selectedRewardDetail.disciplineId === 'all'
+                        ? 'Todas las disciplinas'
+                        : selectedRewardDetail.disciplineId || 'No registrado'}
+                    </dd>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <dt className="text-ink/60">Canjes por alumno</dt>

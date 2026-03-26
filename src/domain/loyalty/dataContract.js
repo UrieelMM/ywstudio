@@ -20,6 +20,7 @@ export const TENANT_SUBCOLLECTIONS = {
   DAILY_USAGE: 'dailyUsage',
   USER_REWARD_COUNTERS: 'userRewardCounters',
   NOTIFICATIONS: 'notifications',
+  CONFIG: 'config',
 }
 
 export const LEDGER_TX_TYPES = {
@@ -102,6 +103,7 @@ export const dataContractSchemas = {
       name: { type: 'string', required: true, minLength: 3 },
       description: { type: 'string', required: false },
       rewardImageUrl: { type: 'string', required: false },
+      disciplineId: { type: 'string', required: false },
       requiredVisits: { type: 'number', required: true, min: 1 },
       stockType: { type: 'string', required: true, enum: Object.values(STOCK_TYPE) },
       stockAvailable: { type: 'number', required: true, min: 0 },
@@ -234,6 +236,19 @@ export const dataContractSchemas = {
       isRead: { type: 'boolean', required: true },
       readAtCustom: { type: 'string', required: false, format: 'customTimestamp' },
       metadata: { type: 'object', required: false },
+      ...auditFields,
+    },
+  },
+  appConfig: {
+    collection: TENANT_SUBCOLLECTIONS.CONFIG,
+    idField: 'configId',
+    fields: {
+      configId: { type: 'string', required: true },
+      tenantId: { type: 'string', required: true },
+      adminName: { type: 'string', required: true, minLength: 2 },
+      logoUrl: { type: 'string', required: false },
+      branches: { type: 'array', required: true, minItems: 1, itemType: 'string' },
+      disciplines: { type: 'array', required: true, minItems: 1, itemType: 'string' },
       ...auditFields,
     },
   },

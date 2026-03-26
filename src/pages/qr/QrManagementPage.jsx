@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { ExternalLink, MapPin, PlusCircle, Printer, QrCode, ScanLine, Settings2, Trash2 } from 'lucide-react'
 import { toDataURL } from 'qrcode'
 import toast from 'react-hot-toast'
+import defaultLogo from '../../assets/ywstudio_logo.jpg'
 import ConfirmModal from '../../components/ui/ConfirmModal'
 import Modal from '../../components/ui/Modal'
 import PageHeader from '../../components/ui/PageHeader'
@@ -48,9 +49,13 @@ const escapeHtml = (value) =>
 
 function QrManagementPage() {
   const qrCampaigns = useOperationsStore((state) => state.qrCampaigns)
+  const appConfig = useOperationsStore((state) => state.appConfig)
   const createQrCampaign = useOperationsStore((state) => state.createQrCampaign)
   const deleteQrCampaign = useOperationsStore((state) => state.deleteQrCampaign)
   const updateQrStatus = useOperationsStore((state) => state.updateQrStatus)
+  const branchOptions = useMemo(() => appConfig.branches || [], [appConfig.branches])
+  const disciplineOptions = useMemo(() => appConfig.disciplines || [], [appConfig.disciplines])
+  const printableLogoUrl = appConfig.logoUrl || new URL(defaultLogo, window.location.origin).toString()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [isQrDetailModalOpen, setIsQrDetailModalOpen] = useState(false)
@@ -63,7 +68,7 @@ function QrManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [draft, setDraft] = useState({
     name: '',
-    branchId: 'Centro',
+    branchId: branchOptions[0] || '',
     disciplineId: 'all',
     mode: 'session',
     validFromLocal: getDefaultValidFromLocal(),
@@ -72,8 +77,32 @@ function QrManagementPage() {
     maxScansPerUserPerDay: 2,
   })
 
+  useEffect(() => {
+    setDraft((previous) => ({
+      ...previous,
+      branchId: branchOptions.includes(previous.branchId) ? previous.branchId : branchOptions[0] || '',
+      disciplineId:
+        previous.disciplineId === 'all' || disciplineOptions.includes(previous.disciplineId)
+          ? previous.disciplineId
+          : disciplineOptions[0] || 'all',
+    }))
+  }, [branchOptions, disciplineOptions])
+
   const activeQrs = qrCampaigns.filter((item) => item.status === 'active').length
+  const pausedQrs = qrCampaigns.filter((item) => item.status !== 'active').length
+  const expiringSoon = qrCampaigns.filter((item) => {
+    if (item.status !== 'active') {
+      return false
+    }
+    const validUntil = dayjs(item.validUntilCustom)
+    if (!validUntil.isValid()) {
+      return false
+    }
+    const now = dayjs()
+    return !validUntil.isBefore(now) && validUntil.diff(now, 'day') <= 7
+  }).length
   const totalScans = qrCampaigns.reduce((acc, item) => acc + Number(item.scans || 0), 0)
+  const branchHint = branchOptions.slice(0, 3).join(' / ') || 'Configura sedes'
 
   const openQrDetails = (qr) => {
     setSelectedQrDetail(qr)
@@ -148,6 +177,7 @@ function QrManagementPage() {
     )
     const safeQrId = escapeHtml(selectedQr.qrCodeId)
     const safePublicUrl = escapeHtml(publicUrl)
+    const safeLogoUrl = escapeHtml(printableLogoUrl)
     const printWindow = window.open('', '_blank', 'width=900,height=900')
     if (!printWindow) {
       toast.error('Activa ventanas emergentes para imprimir el QR.')
@@ -162,7 +192,7 @@ function QrManagementPage() {
         <title>QR ${safeName}</title>
         <style>
           body {
-            font-family: "Manrope", sans-serif;
+            font-family: "Roboto", sans-serif;
             margin: 0;
             padding: 24px;
             color: #2f2219;
@@ -209,7 +239,7 @@ function QrManagementPage() {
       </head>
       <body>
         <section class="card">
-          <img class="logo" src="${window.location.origin}/ywstudio_logo.jpg" alt="Logo" />
+          <img class="logo" src="${safeLogoUrl}" alt="Logo" />
           <p class="title">${safeName}</p>
           <p class="meta">Sede: ${safeBranch} · Disciplina: ${safeDiscipline}</p>
           <img class="qr" src="${qrDataUrl}" alt="QR ${safeName}" />
@@ -304,12 +334,12 @@ function QrManagementPage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={QrCode} label="QRs activos" value={activeQrs} hint="Disponibles para escaneo" />
         <StatCard icon={ScanLine} label="Escaneos acumulados" value={totalScans} hint="En campañas vigentes" />
-        <StatCard icon={MapPin} label="Sedes en operación" value="2" hint="Centro / Norte" />
+        <StatCard icon={MapPin} label="Sedes en operación" value={branchOptions.length} hint={branchHint} />
         <StatCard
           icon={Settings2}
           label="Campañas vigentes"
-          value={activeQrs ? 'Activas' : 'Sin campañas'}
-          hint="Controladas por vigencia"
+          value={activeQrs}
+          hint={`${expiringSoon} por vencer (7 días) · ${pausedQrs} pausadas`}
         />
       </section>
 
@@ -442,7 +472,16 @@ function QrManagementPage() {
               className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
               required
             >
-              <option>Tizayuca</option>
+              {branchOptions.map((branch) => (
+                <option key={branch} value={branch}>
+                  {branch}
+                </option>
+              ))}
+              {!branchOptions.length ? (
+                <option value="" disabled>
+                  Configura sedes en la sección de Configuración
+                </option>
+              ) : null}
             </select>
           </div>
 
@@ -463,10 +502,16 @@ function QrManagementPage() {
               required
             >
               <option value="all">Todas las disciplinas</option>
-              <option>Ballet</option>
-              <option>Jazz</option>
-              <option>Contemporáneo</option>
-              <option>Hip Hop</option>
+              {disciplineOptions.map((discipline) => (
+                <option key={discipline} value={discipline}>
+                  {discipline}
+                </option>
+              ))}
+              {!disciplineOptions.length ? (
+                <option value="" disabled>
+                  Configura disciplinas en la sección de Configuración
+                </option>
+              ) : null}
             </select>
           </div>
 

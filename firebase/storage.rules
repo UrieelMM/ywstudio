@@ -27,13 +27,14 @@ service firebase.storage {
     // Estructura esperada:
     // tenants/{tenantId}/users/{userId}/{fileName}
     // tenants/{tenantId}/rewards/{rewardId}/{fileName}
+    // tenants/{tenantId}/settings/{entityId}/{fileName}
     match /tenants/{tenantId}/{entityType}/{entityId}/{fileName} {
       allow read: if true;
       allow create, update: if hasTenantAccess(tenantId)
-        && (entityType == 'users' || entityType == 'rewards')
+        && (entityType == 'users' || entityType == 'rewards' || entityType == 'settings')
         && isImageUpload();
       allow delete: if hasTenantAccess(tenantId)
-        && (entityType == 'users' || entityType == 'rewards');
+        && (entityType == 'users' || entityType == 'rewards' || entityType == 'settings');
     }
 
     match /{allPaths=**} {
@@ -41,4 +42,3 @@ service firebase.storage {
     }
   }
 }
-

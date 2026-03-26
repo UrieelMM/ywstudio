@@ -8,6 +8,7 @@ import { useOperationsStore } from '../../store/useOperationsStore'
 function Topbar({ title, description, onOpenMobileMenu }) {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
+  const adminName = useOperationsStore((state) => state.appConfig.adminName)
   const notifications = useOperationsStore((state) => state.notifications)
   const markNotificationAsRead = useOperationsStore((state) => state.markNotificationAsRead)
   const markAllNotificationsAsRead = useOperationsStore((state) => state.markAllNotificationsAsRead)
@@ -162,7 +163,7 @@ function Topbar({ title, description, onOpenMobileMenu }) {
 
           <div className="hidden items-center gap-2 rounded-xl border border-secondary/20 bg-shell px-3 py-2 text-sm text-ink sm:flex">
             <UserCircle2 size={16} className="text-secondary" />
-            <span className="max-w-44 truncate font-medium">{user?.email || 'Usuario'}</span>
+            <span className="max-w-44 truncate font-medium">{adminName || user?.email || 'Administrador'}</span>
           </div>
 
           <button

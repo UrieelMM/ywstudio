@@ -11,6 +11,7 @@ const createId = (prefix) =>
   `${prefix}_${dayjs().format('YYYYMMDDHHmmss')}_${Math.random().toString(36).slice(2, 8)}`
 
 const nowCustom = () => createCustomTimestamp()
+const APP_CONFIG_DOC_ID = 'app'
 
 const withAuditFields = (payload, actorId = 'system', isCreate = true) => {
   const timestamp = nowCustom()
@@ -72,6 +73,7 @@ export const createRewardRecord = ({ tenantId, actorId = 'system', ...input }) =
     name: input.name || '',
     description: input.description || '',
     rewardImageUrl: input.rewardImageUrl || '',
+    disciplineId: input.disciplineId || 'all',
     requiredVisits: input.requiredVisits ?? 8,
     stockType: input.stockType || STOCK_TYPE.FINITE,
     stockAvailable: input.stockAvailable ?? 0,
@@ -195,6 +197,19 @@ export const createNotificationRecord = ({ tenantId, actorId = 'system', ...inpu
     isRead: input.isRead ?? false,
     readAtCustom: input.readAtCustom || null,
     metadata: input.metadata || null,
+  }
+
+  return withAuditFields(base, actorId, !input.createdAtCustom)
+}
+
+export const createAppConfigRecord = ({ tenantId, actorId = 'system', ...input }) => {
+  const base = {
+    configId: input.configId || APP_CONFIG_DOC_ID,
+    tenantId,
+    adminName: input.adminName || 'Administrador YW Studio',
+    logoUrl: input.logoUrl || '',
+    branches: Array.isArray(input.branches) ? input.branches : [],
+    disciplines: Array.isArray(input.disciplines) ? input.disciplines : [],
   }
 
   return withAuditFields(base, actorId, !input.createdAtCustom)

@@ -18,6 +18,7 @@ import {
   validateEntityRecord,
 } from '../domain/loyalty/dataContractValidators'
 import {
+  createAppConfigRecord,
   createAuditLogRecord,
   createCheckInRecord,
   createDailyUsageRecord,
@@ -41,6 +42,7 @@ const entityFactoryMap = {
   dailyUsage: createDailyUsageRecord,
   userRewardCounter: createUserRewardCounterRecord,
   notification: createNotificationRecord,
+  appConfig: createAppConfigRecord,
 }
 
 export const tenantDocumentRef = (db, tenantId) =>
@@ -88,6 +90,23 @@ export const createEntityRecord = async ({
     entityId,
     record,
     contractVersion: DATA_CONTRACT_VERSION,
+  }
+}
+
+export const readEntityRecord = async ({
+  db,
+  tenantId,
+  entityKey,
+  entityId,
+}) => {
+  const snapshot = await getDoc(tenantEntityDocRef(db, tenantId, entityKey, entityId))
+  if (!snapshot.exists()) {
+    return null
+  }
+
+  return {
+    id: snapshot.id,
+    ...snapshot.data(),
   }
 }
 

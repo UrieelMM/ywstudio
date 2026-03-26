@@ -145,7 +145,7 @@ function RedemptionsReportsPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <SectionCard
-          title="Bitácora de canjes"
+          title="Historial de canjes"
           description="Seguimiento de canjes con actualización rápida de estado."
         >
           <TableCard

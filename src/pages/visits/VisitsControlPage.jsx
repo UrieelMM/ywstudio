@@ -38,6 +38,20 @@ function VisitsControlPage() {
   const validToday = checkIns.filter((item) => item.isValid).length
   const blockedToday = checkIns.filter((item) => !item.isValid).length
   const usersNearReward = users.filter((user) => user.visitBalanceCached >= 7).length
+  const latestCheckIn = checkIns[0] || null
+  const latestOperationValue = latestCheckIn
+    ? dayjs(latestCheckIn.scannedAtCustom).format('HH:mm')
+    : 'Sin actividad'
+  const latestOperationHint = latestCheckIn
+    ? `${latestCheckIn.isValid ? 'Aprobada' : 'Bloqueada'} · ${latestCheckIn.userName || latestCheckIn.userId}`
+    : 'Aún no hay asistencias registradas en este turno.'
+  const qrNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        qrCampaigns.map((campaign) => [campaign.qrCodeId, campaign.name || campaign.qrCodeId]),
+      ),
+    [qrCampaigns],
+  )
 
   const formattedFeed = useMemo(
     () =>
@@ -96,8 +110,8 @@ function VisitsControlPage() {
         <StatCard
           icon={Clock3}
           label="Última operación"
-          value={lastTransactionResult ? 'Reciente' : 'Sin actividad'}
-          hint={getLastTransactionHint(lastTransactionResult)}
+          value={latestOperationValue}
+          hint={lastTransactionResult ? `${latestOperationHint} · ${getLastTransactionHint(lastTransactionResult)}` : latestOperationHint}
         />
       </section>
 
@@ -133,6 +147,10 @@ function VisitsControlPage() {
                     <p className="text-xs text-ink/65">{row.result}</p>
                   </div>
                 )
+              }
+
+              if (column === 'qrCodeId') {
+                return qrNameById[row.qrCodeId] || row.qrCodeId
               }
 
               return row[column]

@@ -53,7 +53,7 @@ export const defaultProgramRules = {
   maxManualAdjustmentsPerDay: 3,
   milestones: [8, 16, 24],
   allowManualCheckIn: true,
-  allowSameDayRedeem: false,
+  allowSameDayRedeem: true,
 }
 
 export const defaultRewardTemplates = [

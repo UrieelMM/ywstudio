@@ -55,6 +55,17 @@ service cloud.firestore {
       allow delete: if hasTenantAccess(tenantId);
     }
 
+    // Configuración general (logo, sedes, disciplinas, adminName)
+    // Lectura pública para pantalla de login y escaneo público.
+    match /tenants/{tenantId}/config/{docId} {
+      allow read: if hasTenantAccess(tenantId)
+        || isProjectTenant(tenantId);
+      allow create, update: if hasTenantAccess(tenantId)
+        && tenantMatches(tenantId)
+        && hasAuditFields();
+      allow delete: if hasTenantAccess(tenantId);
+    }
+
     // Otras colecciones operativas del tenant
     match /tenants/{tenantId}/{collectionName}/{docId} {
       allow read: if hasTenantAccess(tenantId);

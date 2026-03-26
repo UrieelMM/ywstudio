@@ -2,14 +2,17 @@ import { useMemo, useState } from 'react'
 import { LockKeyhole, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
-import logo from '../../assets/ywstudio_logo.jpg'
+import defaultLogo from '../../assets/ywstudio_logo.jpg'
 import { useAuthStore } from '../../store/useAuthStore'
+import { useOperationsStore } from '../../store/useOperationsStore'
 
 function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const login = useAuthStore((state) => state.login)
   const isLoggingIn = useAuthStore((state) => state.isLoggingIn)
+  const appConfig = useOperationsStore((state) => state.appConfig)
+  const logo = appConfig.logoUrl || defaultLogo
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -20,7 +23,7 @@ function LoginPage() {
     if (typeof from === 'string' && from.startsWith('/')) {
       return from
     }
-    return '/usuarios'
+    return '/dashboard'
   }, [location.state])
 
   const handleSubmit = async (event) => {

@@ -45,6 +45,14 @@ const readImagePreview = (file) =>
     reader.readAsDataURL(file)
   })
 
+const toggleDisciplineSelection = (selectedDisciplines, discipline) => {
+  const current = Array.isArray(selectedDisciplines) ? selectedDisciplines : []
+  if (current.includes(discipline)) {
+    return current.filter((entry) => entry !== discipline)
+  }
+  return [...current, discipline]
+}
+
 const getNextUserNumber = (users) => {
   const maxSequence = users.reduce((max, user) => {
     const match = USER_CODE_REGEX.exec(String(user.userId || '').toLowerCase())
@@ -68,6 +76,9 @@ function UsersPage() {
   const updateUserStatus = useOperationsStore((state) => state.updateUserStatus)
   const deleteUser = useOperationsStore((state) => state.deleteUser)
   const tenantId = useOperationsStore((state) => state.tenantId)
+  const appConfig = useOperationsStore((state) => state.appConfig)
+  const disciplineOptions = useMemo(() => appConfig.disciplines || [], [appConfig.disciplines])
+  const defaultDiscipline = disciplineOptions[0] || 'General'
   const nextUserNumber = getNextUserNumber(users)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -82,7 +93,7 @@ function UsersPage() {
     firstName: '',
     lastName: '',
     phoneE164: '+52',
-    discipline: 'Ballet',
+    disciplineIds: [defaultDiscipline],
     email: '',
     birthDate: '',
   })
@@ -92,7 +103,7 @@ function UsersPage() {
     firstName: '',
     lastName: '',
     phoneE164: '+52',
-    discipline: 'Ballet',
+    disciplineIds: [defaultDiscipline],
     email: '',
     birthDate: '',
     profileImageUrl: '',
@@ -116,6 +127,11 @@ function UsersPage() {
     event.preventDefault()
     if (!draft.firstName.trim() || !draft.lastName.trim() || !draft.phoneE164.trim() || !draft.email.trim()) {
       toast.error('Nombre, apellidos, teléfono y correo son obligatorios.')
+      return
+    }
+
+    if (!Array.isArray(draft.disciplineIds) || !draft.disciplineIds.length) {
+      toast.error('Selecciona al menos una disciplina.')
       return
     }
 
@@ -146,6 +162,7 @@ function UsersPage() {
     const result = await registerUser(
       {
         ...draft,
+        disciplineIds: draft.disciplineIds,
         email: draft.email.trim(),
         birthDate: draft.birthDate || undefined,
         ...(profileImageUrl ? { profileImageUrl } : {}),
@@ -163,7 +180,7 @@ function UsersPage() {
       firstName: '',
       lastName: '',
       phoneE164: '+52',
-      discipline: draft.discipline,
+      disciplineIds: draft.disciplineIds.length ? draft.disciplineIds : [defaultDiscipline],
       email: '',
       birthDate: '',
     })
@@ -175,12 +192,22 @@ function UsersPage() {
   }
 
   const openEditModal = (user) => {
+    const incomingDisciplineIds = Array.isArray(user.disciplineIds) && user.disciplineIds.length
+      ? user.disciplineIds
+      : [defaultDiscipline]
+    const resolvedDisciplineIds = disciplineOptions.length
+      ? incomingDisciplineIds.filter((discipline) => disciplineOptions.includes(discipline))
+      : incomingDisciplineIds
+    const finalDisciplineIds = resolvedDisciplineIds.length
+      ? resolvedDisciplineIds
+      : [defaultDiscipline]
+
     setEditingUserId(user.userId)
     setEditDraft({
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       phoneE164: user.phoneE164 || '+52',
-      discipline: user.disciplineIds?.[0] || 'General',
+      disciplineIds: finalDisciplineIds,
       email: user.email || '',
       birthDate: user.birthDate || '',
       profileImageUrl: user.profileImageUrl || '',
@@ -257,6 +284,11 @@ function UsersPage() {
       return
     }
 
+    if (!Array.isArray(editDraft.disciplineIds) || !editDraft.disciplineIds.length) {
+      toast.error('Selecciona al menos una disciplina.')
+      return
+    }
+
     setIsSavingEdit(true)
 
     let profileImageUrl = editDraft.profileImageUrl || ''
@@ -280,6 +312,7 @@ function UsersPage() {
       editingUserId,
       {
         ...editDraft,
+        disciplineIds: editDraft.disciplineIds,
         profileImageUrl,
       },
       'admin-ui',
@@ -335,9 +368,9 @@ function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Usuarios"
-        title="Registro operativo de usuarios"
-        description="Alta rápida, edición y control de estado de alumnos para equipo administrativo."
+        eyebrow="Alumnos"
+        title="Administración de alumnos"
+        description="Alta rápida, edición y control de estado de alumnos."
         action={
           <button
             type="button"
@@ -345,6 +378,12 @@ function UsersPage() {
               setDraft((previous) => ({
                 ...previous,
                 userId: nextUserNumber,
+                disciplineIds:
+                  Array.isArray(previous.disciplineIds) &&
+                  previous.disciplineIds.length &&
+                  previous.disciplineIds.every((discipline) => disciplineOptions.includes(discipline))
+                    ? previous.disciplineIds
+                    : [defaultDiscipline],
               }))
               setIsCreateModalOpen(true)
             }}
@@ -540,7 +579,7 @@ function UsersPage() {
 
           <div className="space-y-1">
             <label htmlFor="phoneE164" className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
-              Teléfono (E.164) *
+              Teléfono (E.5512345678) *
             </label>
             <input
               id="phoneE164"
@@ -552,23 +591,51 @@ function UsersPage() {
             />
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="discipline" className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
-              Disciplina principal *
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
+              Disciplinas *
             </label>
-            <select
-              id="discipline"
-              value={draft.discipline}
-              onChange={(event) => setDraft((previous) => ({ ...previous, discipline: event.target.value }))}
-              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
-              required
-            >
-              <option>Ballet</option>
-              <option>Jazz</option>
-              <option>Hip Hop</option>
-              <option>Contemporáneo</option>
-              <option>Baile Fitness</option>
-            </select>
+            <div className="rounded-xl border border-secondary/20 bg-surface/60 p-3">
+              {disciplineOptions.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {disciplineOptions.map((discipline) => {
+                    const isSelected = draft.disciplineIds.includes(discipline)
+                    const isPrimary = draft.disciplineIds[0] === discipline
+                    return (
+                      <label
+                        key={discipline}
+                        className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition ${
+                          isSelected
+                            ? 'border-secondary/50 bg-white text-ink'
+                            : 'border-secondary/20 bg-white/70 text-ink/75'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() =>
+                              setDraft((previous) => ({
+                                ...previous,
+                                disciplineIds: toggleDisciplineSelection(previous.disciplineIds, discipline),
+                              }))
+                            }
+                            className="h-4 w-4 rounded border-secondary/40 text-secondary focus:ring-secondary/30"
+                          />
+                          <span>{discipline}</span>
+                        </span>
+                        {isPrimary ? <span className="text-[10px] font-semibold uppercase text-secondary">Principal</span> : null}
+                      </label>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-ink/70">Configura disciplinas en la sección de Configuración.</p>
+              )}
+              <p className="mt-2 text-xs text-ink/65">
+                La primera disciplina seleccionada se guarda como principal.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -713,7 +780,7 @@ function UsersPage() {
 
           <div className="space-y-1">
             <label htmlFor="editPhoneE164" className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
-              Teléfono (E.164) *
+              Teléfono (E.5512345678) *
             </label>
             <input
               id="editPhoneE164"
@@ -725,23 +792,51 @@ function UsersPage() {
             />
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="editDiscipline" className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
-              Disciplina principal *
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/65">
+              Disciplinas *
             </label>
-            <select
-              id="editDiscipline"
-              value={editDraft.discipline}
-              onChange={(event) => setEditDraft((previous) => ({ ...previous, discipline: event.target.value }))}
-              className="w-full rounded-xl border border-secondary/25 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-all duration-200 hover:border-secondary/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
-              required
-            >
-              <option>Ballet</option>
-              <option>Jazz</option>
-              <option>Hip Hop</option>
-              <option>Contemporáneo</option>
-              <option>Baile Fitness</option>
-            </select>
+            <div className="rounded-xl border border-secondary/20 bg-surface/60 p-3">
+              {disciplineOptions.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {disciplineOptions.map((discipline) => {
+                    const isSelected = editDraft.disciplineIds.includes(discipline)
+                    const isPrimary = editDraft.disciplineIds[0] === discipline
+                    return (
+                      <label
+                        key={discipline}
+                        className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition ${
+                          isSelected
+                            ? 'border-secondary/50 bg-white text-ink'
+                            : 'border-secondary/20 bg-white/70 text-ink/75'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() =>
+                              setEditDraft((previous) => ({
+                                ...previous,
+                                disciplineIds: toggleDisciplineSelection(previous.disciplineIds, discipline),
+                              }))
+                            }
+                            className="h-4 w-4 rounded border-secondary/40 text-secondary focus:ring-secondary/30"
+                          />
+                          <span>{discipline}</span>
+                        </span>
+                        {isPrimary ? <span className="text-[10px] font-semibold uppercase text-secondary">Principal</span> : null}
+                      </label>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-ink/70">Configura disciplinas en la sección de Configuración.</p>
+              )}
+              <p className="mt-2 text-xs text-ink/65">
+                La primera disciplina seleccionada se guarda como principal.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-1">
