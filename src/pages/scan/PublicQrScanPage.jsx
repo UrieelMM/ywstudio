@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import dayjs from 'dayjs'
-import { CheckCircle2, QrCode, TriangleAlert, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronDown, QrCode, TriangleAlert, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { doc, getDoc } from 'firebase/firestore'
 import { useParams } from 'react-router-dom'
+import bannerImage from '../../assets/banner.webp'
 import defaultLogo from '../../assets/ywstudio_logo.jpg'
 import Spinner from '../../components/ui/Spinner'
 import { db } from '../../lib/firebase'
@@ -12,6 +13,7 @@ import { runPublicQrCheckIn } from '../../services/loyaltyTransactionsService'
 import { useOperationsStore } from '../../store/useOperationsStore'
 
 const TENANT_ID = 'tenant-ywstudio'
+const DANCE_STUDIO_BANNER_URL = bannerImage
 
 const formatDateTime = (value) => {
   const parsed = dayjs(value)
@@ -37,10 +39,12 @@ function PublicQrScanPage() {
   const { qrCodeId = '' } = useParams()
   const appConfig = useOperationsStore((state) => state.appConfig)
   const logo = appConfig.logoUrl || defaultLogo
+  const formCardRef = useRef(null)
   const [isLoadingQr, setIsLoadingQr] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [scanResult, setScanResult] = useState(null)
   const [qrCampaign, setQrCampaign] = useState(null)
+  const [showScrollCta, setShowScrollCta] = useState(true)
   const [form, setForm] = useState({
     userId: '',
     email: '',
@@ -81,6 +85,25 @@ function PublicQrScanPage() {
       mounted = false
     }
   }, [qrCodeId])
+
+  useEffect(() => {
+    const target = formCardRef.current
+    if (!target) {
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowScrollCta(!entry.isIntersecting)
+      },
+      {
+        threshold: 0.35,
+      },
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [isLoadingQr])
 
   const qrIsLikelyActive = useMemo(() => {
     if (!qrCampaign) {
@@ -149,6 +172,13 @@ function PublicQrScanPage() {
     }
   }
 
+  const scrollToForm = () => {
+    formCardRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-warm px-4 py-8 sm:px-6">
       <div className="pointer-events-none absolute -top-24 right-[-120px] h-80 w-80 rounded-full bg-primary/65 blur-3xl" />
@@ -156,8 +186,47 @@ function PublicQrScanPage() {
 
       <section className="relative mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <article className="rounded-3xl border border-secondary/20 bg-white/90 p-6 shadow-soft sm:p-8">
+          <div className="relative mb-5 overflow-hidden rounded-2xl border border-secondary/20">
+            <img
+              src={DANCE_STUDIO_BANNER_URL}
+              alt="Studio de baile"
+              className="h-36 w-full object-cover sm:h-44"
+              onError={(event) => {
+                event.currentTarget.style.display = 'none'
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-secondary/25 via-primary/20 to-ink/10" />
+            <div className="absolute inset-0 flex items-end justify-start p-4 sm:p-5">
+              <div className="inline-flex items-center gap-3 rounded-xl border border-white/30 bg-white/20 px-3 py-2 backdrop-blur-sm">
+                <img
+                  src={logo}
+                  alt="YW Studio"
+                  className="h-10 w-10 rounded-full border border-white/60 object-cover"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null
+                    event.currentTarget.src = defaultLogo
+                  }}
+                />
+                <div className="text-left">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/85">
+                    YW Studio
+                  </p>
+                  <p className="text-sm font-semibold text-white">Programa de lealtad</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-secondary/25 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-ink/70">
-            <img src={logo} alt="YW Studio" className="h-[20px] w-[20px] rounded-full object-cover shadow-sm" />
+            <img
+              src={logo}
+              alt="YW Studio"
+              className="h-[20px] w-[20px] rounded-full object-cover shadow-sm"
+              onError={(event) => {
+                event.currentTarget.onerror = null
+                event.currentTarget.src = defaultLogo
+              }}
+            />
             ywstudio loyalty
           </div>
           <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-ink sm:text-4xl">
@@ -170,8 +239,8 @@ function PublicQrScanPage() {
 
           <div className="mt-6 grid gap-3 rounded-2xl border border-secondary/20 bg-surface/70 p-4 sm:grid-cols-2">
             <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Código QR</p>
-              <p className="mt-1 font-semibold text-ink">{qrCodeId}</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Campaña</p>
+              <p className="mt-1 font-semibold text-ink">{qrCampaign?.name || 'Registro general'}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.14em] text-ink/60">Estado de vigencia</p>
@@ -194,7 +263,10 @@ function PublicQrScanPage() {
           </div>
         </article>
 
-        <article className="rounded-3xl border border-secondary/20 bg-white/95 p-6 shadow-soft sm:p-8">
+        <article
+          ref={formCardRef}
+          className="rounded-3xl border border-secondary/20 bg-white/95 p-6 shadow-soft sm:p-8"
+        >
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-secondary/25 bg-shell px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink/70">
             <QrCode size={14} className="text-secondary" />
             Registro del alumno
@@ -289,6 +361,20 @@ function PublicQrScanPage() {
           ) : null}
         </article>
       </section>
+
+      {showScrollCta ? (
+        <button
+          type="button"
+          onClick={scrollToForm}
+          className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-secondary/30 bg-white/90 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink shadow-soft backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-secondary/55 hover:bg-white focus:outline-none focus:ring-2 focus:ring-secondary/40 sm:hidden"
+          aria-label="Ir al formulario de registro"
+        >
+          <span>Registro</span>
+          <span className="inline-flex h-6 w-6 animate-bounce items-center justify-center rounded-full bg-secondary text-white">
+            <ChevronDown size={14} />
+          </span>
+        </button>
+      ) : null}
     </main>
   )
 }

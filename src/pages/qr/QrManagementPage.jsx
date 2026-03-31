@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { ExternalLink, MapPin, PlusCircle, Printer, QrCode, ScanLine, Settings2, Trash2 } from 'lucide-react'
 import { toDataURL } from 'qrcode'
 import toast from 'react-hot-toast'
+import bannerImage from '../../assets/banner.webp'
 import defaultLogo from '../../assets/ywstudio_logo.jpg'
 import ConfirmModal from '../../components/ui/ConfirmModal'
 import Modal from '../../components/ui/Modal'
@@ -47,6 +48,8 @@ const escapeHtml = (value) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
+const DANCE_STUDIO_BANNER_URL = bannerImage
+
 function QrManagementPage() {
   const qrCampaigns = useOperationsStore((state) => state.qrCampaigns)
   const appConfig = useOperationsStore((state) => state.appConfig)
@@ -55,7 +58,9 @@ function QrManagementPage() {
   const updateQrStatus = useOperationsStore((state) => state.updateQrStatus)
   const branchOptions = useMemo(() => appConfig.branches || [], [appConfig.branches])
   const disciplineOptions = useMemo(() => appConfig.disciplines || [], [appConfig.disciplines])
-  const printableLogoUrl = appConfig.logoUrl || new URL(defaultLogo, window.location.origin).toString()
+  const defaultLogoUrl = new URL(defaultLogo, window.location.origin).toString()
+  const printableLogoUrl = appConfig.logoUrl || defaultLogoUrl
+  const printableBannerUrl = new URL(DANCE_STUDIO_BANNER_URL, window.location.origin).toString()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [isQrDetailModalOpen, setIsQrDetailModalOpen] = useState(false)
@@ -175,9 +180,10 @@ function QrManagementPage() {
     const safeDiscipline = escapeHtml(
       selectedQr.disciplineId === 'all' ? 'Todas las disciplinas' : selectedQr.disciplineId,
     )
-    const safeQrId = escapeHtml(selectedQr.qrCodeId)
     const safePublicUrl = escapeHtml(publicUrl)
     const safeLogoUrl = escapeHtml(printableLogoUrl)
+    const safeFallbackLogoUrl = escapeHtml(defaultLogoUrl)
+    const safeBannerUrl = escapeHtml(printableBannerUrl)
     const printWindow = window.open('', '_blank', 'width=900,height=900')
     if (!printWindow) {
       toast.error('Activa ventanas emergentes para imprimir el QR.')
@@ -194,61 +200,192 @@ function QrManagementPage() {
           body {
             font-family: "Roboto", sans-serif;
             margin: 0;
-            padding: 24px;
+            padding: 18px;
             color: #2f2219;
-            background: #fffdfb;
+            background: radial-gradient(circle at top right, #f6ece5 0%, #fffaf6 40%, #f1e6df 100%);
           }
           .card {
-            max-width: 640px;
+            max-width: 720px;
             margin: 0 auto;
             border: 1px solid #d8c0b2;
-            border-radius: 18px;
-            padding: 24px;
+            border-radius: 22px;
+            padding: 0;
+            overflow: hidden;
             text-align: center;
+            background: #fffdfa;
+            box-shadow: 0 24px 46px -28px rgba(56, 34, 20, 0.45);
+          }
+          .hero {
+            position: relative;
+            height: 220px;
+            overflow: hidden;
+            border-bottom: 1px solid #e8d8cf;
+          }
+          .hero-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+          }
+          .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(115deg, rgba(184, 148, 127, 0.24), rgba(224, 206, 194, 0.18));
+          }
+          .hero-content {
+            position: absolute;
+            left: 22px;
+            right: 22px;
+            bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: flex-start;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(216, 192, 178, 0.85);
+            border-radius: 14px;
+            padding: 10px 12px;
           }
           .logo {
-            width: 56px;
-            height: 56px;
+            width: 58px;
+            height: 58px;
             border-radius: 50%;
             object-fit: cover;
-            margin: 0 auto 12px;
-            display: block;
             border: 1px solid #d8c0b2;
           }
+          .hero-text {
+            text-align: left;
+            color: #2f2219;
+          }
+          .hero-kicker {
+            margin: 0;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            opacity: 0.88;
+          }
           .title {
-            font-size: 26px;
+            margin: 3px 0 0;
+            font-size: 21px;
             font-weight: 700;
-            margin-bottom: 8px;
+            line-height: 1.2;
+          }
+          .content {
+            padding: 24px;
+          }
+          .print-head {
+            display: none;
+          }
+          .print-banner {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+            border-bottom: 1px solid #e8d8cf;
+          }
+          .print-head-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
           }
           .meta {
             font-size: 14px;
             opacity: 0.8;
-            margin-bottom: 20px;
+            margin: 0 0 18px;
           }
           .qr {
-            width: min(75vw, 380px);
-            height: min(75vw, 380px);
+            width: min(76vw, 360px);
+            height: min(76vw, 360px);
+            border-radius: 16px;
+            border: 1px solid #dfc9bb;
+            background: #fff;
+            padding: 10px;
           }
-          .code {
+          .url {
             font-size: 12px;
-            margin-top: 10px;
+            margin: 12px auto 0;
             opacity: 0.75;
             word-break: break-all;
+            max-width: 520px;
+          }
+          @media print {
+            body {
+              padding: 0;
+              background: #fff;
+            }
+            .card {
+              border: none;
+              box-shadow: none;
+              max-width: none;
+              border-radius: 0;
+            }
+            .hero-content {
+              background: #fff;
+              border-color: #d8c0b2;
+            }
+            .hero {
+              display: none;
+            }
+            .print-head {
+              display: block;
+            }
           }
         </style>
       </head>
       <body>
         <section class="card">
-          <img class="logo" src="${safeLogoUrl}" alt="Logo" />
-          <p class="title">${safeName}</p>
-          <p class="meta">Sede: ${safeBranch} · Disciplina: ${safeDiscipline}</p>
-          <img class="qr" src="${qrDataUrl}" alt="QR ${safeName}" />
-          <p class="code">ID: ${safeQrId}</p>
-          <p class="code">${safePublicUrl}</p>
+          <div class="print-head">
+            <img class="print-banner" src="${safeBannerUrl}" alt="Studio de baile" onerror="this.style.display='none'" data-critical="true" />
+            <div class="print-head-row">
+              <img class="logo" src="${safeLogoUrl}" alt="Logo" onerror="this.onerror=null;this.src='${safeFallbackLogoUrl}'" data-critical="true" />
+              <div class="hero-text">
+                <p class="hero-kicker">YW Studio · Registro de clase</p>
+                <p class="title">${safeName}</p>
+              </div>
+            </div>
+          </div>
+          <div class="hero">
+            <img class="hero-image" src="${safeBannerUrl}" alt="Studio de baile" onerror="this.style.display='none'" data-critical="true" />
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+              <img class="logo" src="${safeLogoUrl}" alt="Logo" onerror="this.onerror=null;this.src='${safeFallbackLogoUrl}'" data-critical="true" />
+              <div class="hero-text">
+                <p class="hero-kicker">YW Studio · Registro de clase</p>
+                <p class="title">${safeName}</p>
+              </div>
+            </div>
+          </div>
+          <div class="content">
+            <p class="meta">Sede: ${safeBranch} · Disciplina: ${safeDiscipline}</p>
+            <img class="qr" src="${qrDataUrl}" alt="QR ${safeName}" />
+            <p class="url">${safePublicUrl}</p>
+          </div>
         </section>
         <script>
-          window.onload = () => {
-            window.print()
+          const waitForImages = () => {
+            const images = Array.from(document.images || [])
+            if (!images.length) {
+              return Promise.resolve()
+            }
+            return Promise.all(
+              images.map((image) =>
+                image.complete && image.naturalWidth > 0
+                  ? Promise.resolve()
+                  : new Promise((resolve) => {
+                      image.onload = () => resolve()
+                      image.onerror = () => resolve()
+                      setTimeout(resolve, 5000)
+                    }),
+              ),
+            )
+          }
+
+          window.onload = async () => {
+            await waitForImages()
+            setTimeout(() => {
+              window.print()
+            }, 180)
           }
         </script>
       </body>
@@ -693,15 +830,47 @@ function QrManagementPage() {
       >
         <div className="space-y-4">
           {selectedQr ? (
-            <div className="rounded-xl border border-secondary/20 bg-surface/70 p-4">
-              <p className="font-semibold text-ink">{selectedQr.name}</p>
-              <p className="text-xs text-ink/65">
-                {selectedQr.branchId} · {selectedQr.disciplineId === 'all' ? 'Todas las disciplinas' : selectedQr.disciplineId} · {selectedQr.qrCodeId}
-              </p>
+            <div className="overflow-hidden rounded-2xl border border-secondary/20 bg-white shadow-soft">
+              <div className="relative h-40 sm:h-44">
+                <img
+                  src={printableBannerUrl}
+                  alt="Studio de baile"
+                  className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none'
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-secondary/25 via-primary/20 to-ink/10" />
+                <div className="absolute inset-0 flex items-end justify-center p-4 sm:justify-start">
+                  <div className="inline-flex items-center gap-3 rounded-xl border border-white/30 bg-white/20 px-3 py-2 backdrop-blur-sm">
+                    <img
+                      src={printableLogoUrl}
+                      alt="YW Studio"
+                      className="h-10 w-10 rounded-full border border-white/70 object-cover"
+                      onError={(event) => {
+                        event.currentTarget.onerror = null
+                        event.currentTarget.src = defaultLogoUrl
+                      }}
+                    />
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/85">
+                        YW Studio
+                      </p>
+                      <p className="text-sm font-semibold text-white">{selectedQr.name}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white px-4 py-3">
+                <p className="text-xs text-ink/70">
+                  {selectedQr.branchId} ·{' '}
+                  {selectedQr.disciplineId === 'all' ? 'Todas las disciplinas' : selectedQr.disciplineId}
+                </p>
+              </div>
             </div>
           ) : null}
 
-          <div className="flex justify-center rounded-2xl border border-secondary/20 bg-white p-5">
+          <div className="flex justify-center rounded-2xl border border-secondary/20 bg-white p-5 shadow-soft">
             {isGeneratingPrintQr ? (
               <div className="flex h-64 w-64 items-center justify-center text-secondary">
                 <Spinner className="h-14 w-14" />
@@ -710,7 +879,7 @@ function QrManagementPage() {
               <img
                 src={qrDataUrl}
                 alt={`QR ${selectedQr?.name || ''}`}
-                className="h-64 w-64 rounded-xl border border-secondary/15 bg-white p-2"
+                className="h-64 w-64 rounded-2xl border border-secondary/15 bg-white p-2 sm:h-72 sm:w-72"
               />
             ) : (
               <p className="text-sm text-ink/65">No se pudo generar la imagen del QR.</p>
