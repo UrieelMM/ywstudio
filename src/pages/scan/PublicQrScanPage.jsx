@@ -180,7 +180,7 @@ function PublicQrScanPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-warm px-4 py-8 sm:px-6">
+    <main className="relative min-h-screen overflow-x-hidden bg-warm px-4 py-8 sm:px-6">
       <div className="pointer-events-none absolute -top-24 right-[-120px] h-80 w-80 rounded-full bg-primary/65 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-130px] left-[-100px] h-80 w-80 rounded-full bg-secondary/25 blur-3xl" />
 
@@ -192,7 +192,7 @@ function PublicQrScanPage() {
               alt="Studio de baile"
               className="h-36 w-full object-cover sm:h-44"
               onError={(event) => {
-                event.currentTarget.style.display = 'none'
+                event.currentTarget.style.opacity = '0.45'
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-secondary/25 via-primary/20 to-ink/10" />
