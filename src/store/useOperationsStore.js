@@ -135,6 +135,18 @@ const sortByDateDesc = (rows, dateField) => {
   })
 }
 
+const dedupeNotificationsById = (rows) => {
+  const seen = new Set()
+  return rows.filter((entry) => {
+    const key = String(entry?.notificationId || entry?.id || '')
+    if (!key || seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+}
+
 const getUserById = (users, userId) => users.find((user) => user.userId === userId)
 const getRewardById = (rewards, rewardId) => rewards.find((reward) => reward.rewardId === rewardId)
 const getQrById = (qrs, qrCodeId) => qrs.find((qr) => qr.qrCodeId === qrCodeId)
@@ -297,7 +309,10 @@ export const useOperationsStore = create()((set, get) => ({
       const sortedRewards = sortByDateDesc(rewards, 'createdAtCustom')
       const sortedCheckIns = sortByDateDesc(checkIns, 'scannedAtCustom')
       const sortedRedemptions = sortByDateDesc(redemptions, 'requestedAtCustom')
-      const sortedNotifications = sortByDateDesc(notifications, 'createdAtCustom')
+      const sortedNotifications = sortByDateDesc(
+        dedupeNotificationsById(notifications),
+        'createdAtCustom',
+      )
       const normalizedAppConfig = normalizeAppConfig(appConfigRecord)
 
       const derived = withDerivedOperationFields({
@@ -509,7 +524,7 @@ export const useOperationsStore = create()((set, get) => ({
       maxItems: 400,
       onData: (items) => {
         set({
-          notifications: sortByDateDesc(items, 'createdAtCustom'),
+          notifications: sortByDateDesc(dedupeNotificationsById(items), 'createdAtCustom'),
         })
       },
       onError: () => {

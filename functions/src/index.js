@@ -5,6 +5,7 @@ import { getDatabase } from 'firebase-admin/database'
 import { getFirestore } from 'firebase-admin/firestore'
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { onSchedule } from 'firebase-functions/v2/scheduler'
 
 let firebaseConfig = {}
 try {
@@ -87,7 +88,25 @@ const DEFAULT_RULEBOOK = {
   allowSameDayRedeem: true,
 }
 
+const BUSINESS_TIMEZONE = 'America/Mexico_City'
+const BIRTHDAY_NOTIFICATION_TYPE = 'birthday_today'
+
 const dayKeyFromDate = (dateObj) => dateObj.format('YYYY-MM-DD')
+
+const monthDayFromDateString = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) {
+    return null
+  }
+
+  const isoDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (isoDateMatch) {
+    return `${isoDateMatch[2]}-${isoDateMatch[3]}`
+  }
+
+  const parsed = dayjs(raw)
+  return parsed.isValid() ? parsed.format('MM-DD') : null
+}
 
 const sanitizeIdempotencyKey = (value) =>
   String(value || '')
@@ -1268,5 +1287,107 @@ export const redeemReward = onCall(
     })
 
     return result
+  },
+)
+
+export const notifyBirthdayStudentsDaily = onSchedule(
+  {
+    region: 'us-central1',
+    schedule: '0 6 * * *',
+    timeZone: BUSINESS_TIMEZONE,
+    timeoutSeconds: 300,
+    memory: '256MiB',
+  },
+  async () => {
+    const now = dayjs()
+    const createdAtCustom = now.format(CUSTOM_TIMESTAMP_FORMAT)
+    const dayKeyCompact = now.format('YYYYMMDD')
+    const monthDayKey = now.format('MM-DD')
+    const actorId = 'system-birthday-bot'
+
+    const tenantsSnapshot = await db.collection('tenants').limit(80).get()
+    if (tenantsSnapshot.empty) {
+      return
+    }
+
+    for (const tenantDoc of tenantsSnapshot.docs) {
+      const tenantId = String(tenantDoc.id || '').trim()
+      if (!tenantId) {
+        continue
+      }
+
+      const usersSnapshot = await db
+        .collection(`tenants/${tenantId}/${COLLECTIONS.USERS}`)
+        .where('status', '==', USER_STATUS.ACTIVE)
+        .limit(1200)
+        .get()
+
+      if (usersSnapshot.empty) {
+        continue
+      }
+
+      const notificationsCollection = db.collection(`tenants/${tenantId}/${COLLECTIONS.NOTIFICATIONS}`)
+      let pendingWrites = []
+
+      const commitBatch = async () => {
+        if (!pendingWrites.length) {
+          return
+        }
+        const batch = db.batch()
+        pendingWrites.forEach(({ ref, payload }) => {
+          batch.set(ref, payload, { merge: true })
+        })
+        pendingWrites = []
+        await batch.commit()
+      }
+
+      for (const userDoc of usersSnapshot.docs) {
+        const user = userDoc.data()
+        const birthMonthDay = monthDayFromDateString(user.birthDate)
+        if (!birthMonthDay || birthMonthDay !== monthDayKey) {
+          continue
+        }
+
+        const userId = String(user.userId || userDoc.id || '').trim()
+        if (!userId) {
+          continue
+        }
+
+        const userName = String(
+          user.fullName || `${user.firstName || ''} ${user.lastName || ''}` || userId,
+        )
+          .replace(/\s+/g, ' ')
+          .trim()
+
+        const notificationId = `ntf_birthday_${dayKeyCompact}_${userId}`
+        const notificationRef = notificationsCollection.doc(notificationId)
+        const notificationPayload = createNotificationRecord({
+          tenantId,
+          notificationId,
+          type: BIRTHDAY_NOTIFICATION_TYPE,
+          title: 'Cumpleaños del día',
+          message: `Hoy es cumpleaños de ${userName}.`,
+          userId,
+          metadata: {
+            userName,
+            birthDate: user.birthDate || null,
+            celebration: true,
+          },
+          createdAtCustom,
+          actorId,
+        })
+
+        pendingWrites.push({
+          ref: notificationRef,
+          payload: notificationPayload,
+        })
+
+        if (pendingWrites.length >= 400) {
+          await commitBatch()
+        }
+      }
+
+      await commitBatch()
+    }
   },
 )

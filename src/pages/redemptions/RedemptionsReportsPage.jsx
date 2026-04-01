@@ -35,6 +35,8 @@ const getRedemptionBadge = (status) => {
   return getFriendlyRedemptionStatus(status)
 }
 
+const BIRTHDAY_NOTIFICATION_TYPE = 'birthday_today'
+
 function RedemptionsReportsPage() {
   const users = useOperationsStore((state) => state.users)
   const rewards = useOperationsStore((state) => state.rewards)
@@ -224,7 +226,11 @@ function RedemptionsReportsPage() {
               recentNotifications.map((notification) => (
                 <article
                   key={notification.notificationId}
-                  className="rounded-xl border border-secondary/15 bg-surface/70 px-3 py-2 shadow-sm transition-all duration-300 hover:shadow-soft hover:border-secondary/30"
+                  className={`rounded-xl border px-3 py-2 shadow-sm transition-all duration-300 hover:shadow-soft ${
+                    notification.type === BIRTHDAY_NOTIFICATION_TYPE
+                      ? 'border-secondary/35 bg-gradient-to-r from-primary/35 to-white hover:border-secondary/45'
+                      : 'border-secondary/15 bg-surface/70 hover:border-secondary/30'
+                  }`}
                 >
                   <p className="text-sm font-semibold text-ink">{notification.title}</p>
                   <p className="text-xs text-ink/70">{notification.message}</p>
@@ -246,4 +252,3 @@ function RedemptionsReportsPage() {
 }
 
 export default RedemptionsReportsPage
-

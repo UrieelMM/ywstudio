@@ -1,9 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import dayjs from 'dayjs'
-import { Bell, LogOut, Menu, UserCircle2 } from 'lucide-react'
+import { Bell, Gift, LogOut, Menu, Sparkles, UserCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useOperationsStore } from '../../store/useOperationsStore'
+
+const BIRTHDAY_NOTIFICATION_TYPE = 'birthday_today'
+
+const getNotificationTheme = (notification) => {
+  const isBirthday = notification?.type === BIRTHDAY_NOTIFICATION_TYPE
+
+  if (isBirthday) {
+    return {
+      isBirthday: true,
+      containerClass: notification.isRead
+        ? 'border-secondary/30 bg-gradient-to-r from-primary/20 to-white'
+        : 'border-secondary/50 bg-gradient-to-r from-primary/45 via-shell to-secondary/15',
+      icon: Gift,
+      iconClass: 'bg-secondary text-white',
+      pill: 'Cumpleaños',
+      pillClass: 'border-secondary/30 bg-white/80 text-secondary',
+    }
+  }
+
+  return {
+    isBirthday: false,
+    containerClass: notification.isRead
+      ? 'border-secondary/15 bg-white'
+      : 'border-secondary/35 bg-secondary/5',
+    icon: null,
+    iconClass: '',
+    pill: null,
+    pillClass: '',
+  }
+}
 
 function Topbar({ title, description, onOpenMobileMenu }) {
   const user = useAuthStore((state) => state.user)
@@ -121,26 +151,46 @@ function Topbar({ title, description, onOpenMobileMenu }) {
                 {notificationItems.length ? (
                   <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
                     {notificationItems.map((notification) => (
-                      <button
-                        key={notification.notificationId}
-                        type="button"
-                        onClick={async () => {
-                          if (!notification.isRead) {
-                            await markNotificationAsRead(notification.notificationId, 'admin-ui')
-                          }
-                        }}
-                        className={`w-full rounded-xl border px-3 py-2 text-left transition ${
-                          notification.isRead
-                            ? 'border-secondary/15 bg-white'
-                            : 'border-secondary/35 bg-secondary/5'
-                        }`}
-                      >
-                        <p className="text-sm font-semibold text-ink">{notification.title}</p>
-                        <p className="mt-0.5 text-xs text-ink/75">{notification.message}</p>
-                        <p className="mt-1 text-[11px] text-ink/55">
-                          {dayjs(notification.createdAtCustom).format('DD MMM YYYY · HH:mm')}
-                        </p>
-                      </button>
+                      (() => {
+                        const theme = getNotificationTheme(notification)
+                        const Icon = theme.icon
+
+                        return (
+                          <button
+                            key={notification.notificationId}
+                            type="button"
+                            onClick={async () => {
+                              if (!notification.isRead) {
+                                await markNotificationAsRead(notification.notificationId, 'admin-ui')
+                              }
+                            }}
+                            className={`w-full rounded-xl border px-3 py-2 text-left transition ${theme.containerClass}`}
+                          >
+                            <div className="flex items-start gap-2">
+                              {Icon ? (
+                                <span className={`mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full ${theme.iconClass}`}>
+                                  <Icon size={14} />
+                                </span>
+                              ) : null}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <p className="text-sm font-semibold text-ink">{notification.title}</p>
+                                  {theme.pill ? (
+                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${theme.pillClass}`}>
+                                      <Sparkles size={10} />
+                                      {theme.pill}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-0.5 text-xs text-ink/75">{notification.message}</p>
+                                <p className="mt-1 text-[11px] text-ink/55">
+                                  {dayjs(notification.createdAtCustom).format('DD MMM YYYY · HH:mm')}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })()
                     ))}
                     {notifications.length > notificationItems.length ? (
                       <button
